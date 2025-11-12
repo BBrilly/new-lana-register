@@ -65,9 +65,9 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
 
         <div className="mt-6 grid grid-cols-2 gap-4">
           <div className="rounded-lg bg-muted/50 p-4">
-            <p className="text-xs font-medium text-muted-foreground">LAN Stanje</p>
+            <p className="text-xs font-medium text-muted-foreground">LAN Balance</p>
             <p className="mt-1 text-2xl font-bold text-foreground">
-              {wallet.lanAmount.toLocaleString("sl-SI", {
+              {wallet.lanAmount.toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -75,10 +75,10 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
             <p className="mt-0.5 text-xs text-muted-foreground">LAN</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-4">
-            <p className="text-xs font-medium text-muted-foreground">EUR Vrednost</p>
+            <p className="text-xs font-medium text-muted-foreground">EUR Value</p>
             <p className="mt-1 text-2xl font-bold text-foreground">
               €{" "}
-              {wallet.eurAmount.toLocaleString("sl-SI", {
+              {wallet.eurAmount.toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -107,7 +107,7 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
 
         {wallet.events.length > 0 && (
           <div className="mt-4">
-            <h4 className="mb-2 text-sm font-semibold text-foreground">Zadnji Eventi</h4>
+            <h4 className="mb-2 text-sm font-semibold text-foreground">Recent Events</h4>
             <div className="space-y-2">
               {wallet.events.slice(0, 3).map((event) => (
                 <div
@@ -120,10 +120,10 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
                         variant={event.type === "unregistered_lan" ? "destructive" : "secondary"}
                         className="text-xs"
                       >
-                        {event.type === "unregistered_lan" ? "Neregistrirana" : event.type}
+                        {event.type === "unregistered_lan" ? "Unregistered" : event.type}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {new Date(event.timestamp).toLocaleString("sl-SI")}
+                        {new Date(event.timestamp).toLocaleString("en-US")}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-foreground">{event.description}</p>

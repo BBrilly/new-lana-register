@@ -30,7 +30,7 @@ const StatCard = ({ title, value, subtitle, icon, trend }: StatCardProps) => {
                 {trend.isPositive ? "+" : ""}
                 {trend.value}
               </span>
-              <span className="text-xs text-muted-foreground">vs. prejšnji mesec</span>
+              <span className="text-xs text-muted-foreground">vs. last month</span>
             </div>
           )}
         </div>

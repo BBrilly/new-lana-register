@@ -30,7 +30,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
             <p className="mt-1 text-muted-foreground">
-              Pregled vseh LAN denarnic in skupne vrednosti
+              Overview of all LAN wallets and total value
             </p>
           </div>
           <AddWalletDialog onAdd={handleAddWallet} />
@@ -38,41 +38,41 @@ const Dashboard = () => {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Skupaj LAN"
-            value={totalLan.toLocaleString("sl-SI", {
+            title="Total LAN"
+            value={totalLan.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
-            subtitle="Vseh denarnic"
+            subtitle="All wallets"
             icon={<WalletIcon className="h-6 w-6" />}
             trend={{ value: "12.5%", isPositive: true }}
           />
           <StatCard
-            title="Skupaj EUR"
-            value={`€ ${totalEur.toLocaleString("sl-SI", {
+            title="Total EUR"
+            value={`€ ${totalEur.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}`}
-            subtitle={`Menjalni tečaj: 1 LAN = ${EUR_CONVERSION_RATE} EUR`}
+            subtitle={`Exchange rate: 1 LAN = ${EUR_CONVERSION_RATE} EUR`}
             icon={<Euro className="h-6 w-6" />}
             trend={{ value: "8.2%", isPositive: true }}
           />
           <StatCard
-            title="Aktivne Denarnice"
+            title="Active Wallets"
             value={totalWallets.toString()}
-            subtitle="Registrirane denarnice"
+            subtitle="Registered wallets"
             icon={<TrendingUp className="h-6 w-6" />}
           />
           <StatCard
-            title="Nepreglerjeni Eventi"
+            title="Unreviewed Events"
             value={unreadEvents.toString()}
-            subtitle="Zahtevajo vašo pozornost"
+            subtitle="Require your attention"
             icon={<Activity className="h-6 w-6" />}
           />
         </div>
 
         <div className="rounded-xl border border-border bg-card p-6">
-          <h2 className="text-xl font-semibold text-foreground">Hitri Pregled Denarnic</h2>
+          <h2 className="text-xl font-semibold text-foreground">Quick Wallet Overview</h2>
           <div className="mt-4 space-y-3">
             {wallets.map((wallet) => (
               <div
@@ -90,7 +90,7 @@ const Dashboard = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-semibold text-foreground">
-                    {wallet.lanAmount.toLocaleString("sl-SI", {
+                    {wallet.lanAmount.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{" "}
@@ -98,7 +98,7 @@ const Dashboard = () => {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     €{" "}
-                    {wallet.eurAmount.toLocaleString("sl-SI", {
+                    {wallet.eurAmount.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}

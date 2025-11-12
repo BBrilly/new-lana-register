@@ -33,7 +33,7 @@ const Layout = ({ children }: LayoutProps) => {
                 activeClassName="bg-secondary text-foreground"
               >
                 <Wallet className="h-4 w-4" />
-                Denarnice
+                Wallets
               </NavLink>
             </div>
           </div>

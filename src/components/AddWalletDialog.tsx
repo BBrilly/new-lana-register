@@ -38,7 +38,7 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletNumber || !description) {
-      toast.error("Prosim izpolnite vsa polja");
+      toast.error("Please fill in all fields");
       return;
     }
     onAdd({ walletNumber, type, description });
@@ -46,7 +46,7 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
     setDescription("");
     setType("Hardware");
     setOpen(false);
-    toast.success("Denarnica uspešno dodana!");
+    toast.success("Wallet successfully added!");
   };
 
   return (
@@ -54,19 +54,19 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
       <DialogTrigger asChild>
         <Button size="lg" className="gap-2">
           <Plus className="h-5 w-5" />
-          Dodaj Denarnico
+          Add Wallet
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Dodaj Novo Denarnico</DialogTitle>
+          <DialogTitle>Add New Wallet</DialogTitle>
           <DialogDescription>
-            Vnesite podatke o novi LAN denarnici za sledenje.
+            Enter details for the new LAN wallet to track.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="walletNumber">Številka Denarnice</Label>
+            <Label htmlFor="walletNumber">Wallet Number</Label>
             <Input
               id="walletNumber"
               placeholder="0x..."
@@ -76,7 +76,7 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="type">Tip Denarnice</Label>
+            <Label htmlFor="type">Wallet Type</Label>
             <Select value={type} onValueChange={(value: any) => setType(value)}>
               <SelectTrigger id="type">
                 <SelectValue />
@@ -89,10 +89,10 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Opis</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="Opis denarnice..."
+              placeholder="Wallet description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -100,9 +100,9 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Prekliči
+              Cancel
             </Button>
-            <Button type="submit">Dodaj Denarnico</Button>
+            <Button type="submit">Add Wallet</Button>
           </div>
         </form>
       </DialogContent>
