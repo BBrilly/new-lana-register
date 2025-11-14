@@ -1,12 +1,27 @@
 import { ReactNode } from "react";
 import { NavLink } from "@/components/NavLink";
-import { Wallet, LayoutDashboard } from "lucide-react";
+import { Wallet, LayoutDashboard, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { logout, isAuthenticated } from "@/utils/wifAuth";
+import { useToast } from "@/hooks/use-toast";
 interface LayoutProps {
   children: ReactNode;
 }
-const Layout = ({
-  children
-}: LayoutProps) => {
+
+const Layout = ({ children }: LayoutProps) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const authenticated = isAuthenticated();
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out",
+    });
+    navigate("/login");
+  };
   return <div className="min-h-screen bg-background">
       <nav className="border-b border-border bg-card">
         <div className="container mx-auto px-4">
@@ -26,6 +41,17 @@ const Layout = ({
                 <Wallet className="h-4 w-4" />
                 Wallets
               </NavLink>
+              {authenticated && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-sm font-medium"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              )}
             </div>
           </div>
         </div>
