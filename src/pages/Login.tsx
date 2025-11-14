@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Key, Shield, QrCode } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
-import { convertWifToIds, storeAuthSession } from "@/utils/wifAuth";
+import { convertWifToIds, storeAuthSession, storeUserProfile } from "@/utils/wifAuth";
+import { fetchUserProfile } from "@/utils/profileVerification";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
@@ -43,12 +44,29 @@ const Login = () => {
       // Convert WIF to identifiers
       const authData = await convertWifToIds(wifKey.trim());
 
-      // Store in session
+      // Fetch user profile from Nostr
+      toast({
+        title: "Verifying profile",
+        description: "Checking your profile on Nostr network...",
+      });
+
+      const profile = await fetchUserProfile(authData.nostrHexId);
+
+      if (!profile) {
+        throw new Error("No profile found. Please create a KIND 0 profile first.");
+      }
+
+      if (!profile.name) {
+        throw new Error("Profile is incomplete. Please ensure your profile has a name.");
+      }
+
+      // Store auth data and profile in session
       storeAuthSession(authData);
+      storeUserProfile(profile);
 
       toast({
         title: "Login successful",
-        description: "Welcome to Lana Register",
+        description: `Welcome back, ${profile.display_name || profile.name}!`,
       });
 
       // Redirect to dashboard

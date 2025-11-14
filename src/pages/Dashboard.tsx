@@ -7,7 +7,7 @@ import { MOCK_WALLETS, EUR_CONVERSION_RATE } from "@/data/mockData";
 import { Wallet } from "@/types/wallet";
 import { Wallet as WalletIcon, TrendingUp, Euro, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { isAuthenticated, getAuthSession } from "@/utils/wifAuth";
+import { isAuthenticated, getAuthSession, getUserProfile } from "@/utils/wifAuth";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ const Dashboard = () => {
   }, [navigate]);
 
   const authSession = getAuthSession();
+  const userProfile = getUserProfile();
 
   const totalLan = wallets.reduce((sum, wallet) => sum + wallet.lanAmount, 0);
   const totalEur = wallets.reduce((sum, wallet) => sum + wallet.eurAmount, 0);
@@ -39,25 +40,27 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* User Info Card */}
-        {authSession && (
-          <Card className="p-6 bg-primary/5 border-primary/20">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Authenticated Session</h2>
-            <div className="grid gap-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">Wallet ID:</span>
-                <p className="font-mono text-foreground mt-1 break-all">{authSession.walletId}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Nostr ID (HEX):</span>
-                <p className="font-mono text-xs text-foreground mt-1 break-all">{authSession.nostrHexId}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Nostr ID (npub):</span>
-                <p className="font-mono text-xs text-foreground mt-1 break-all">{authSession.nostrNpubId}</p>
-              </div>
+        {/* Welcome Message with Profile */}
+        {userProfile && (
+          <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+            <h2 className="text-2xl font-bold text-foreground mb-2">
+              Welcome back, {userProfile.display_name || userProfile.name}!
+            </h2>
+            {userProfile.about && (
+              <p className="text-muted-foreground mb-3">{userProfile.about}</p>
+            )}
+            <div className="flex flex-wrap gap-4 text-sm">
+              {userProfile.location && (
+                <span className="text-muted-foreground">📍 {userProfile.location}</span>
+              )}
+              {userProfile.currency && (
+                <span className="text-muted-foreground">💰 {userProfile.currency}</span>
+              )}
+              {userProfile.whoAreYou && (
+                <span className="text-muted-foreground">👤 {userProfile.whoAreYou}</span>
+              )}
             </div>
-          </Card>
+          </div>
         )}
 
         <div className="flex items-center justify-between">
