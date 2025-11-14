@@ -6,12 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
+import NostrStatusDialog from "@/components/NostrStatusDialog";
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const [systemParams, setSystemParams] = useState<SystemParameters | null>(null);
   const [relayStatuses, setRelayStatuses] = useState<RelayStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -121,15 +123,17 @@ const LandingPage = () => {
 
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
-        {/* Nostr Connection Status */}
+        {/* Nostr Connection Status - Clickable */}
         {!isLoading && systemParams && (
           <div className="mb-8 flex justify-end">
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-sm">
-                <Wifi className="h-4 w-4 text-success" />
-                <span className="font-medium">{connectedRelays}/{totalRelays} connected</span>
-              </div>
-            </Card>
+            <Button
+              variant="outline"
+              onClick={() => setShowStatusDialog(true)}
+              className="gap-2"
+            >
+              <Wifi className="h-4 w-4 text-success" />
+              <span className="font-medium">{connectedRelays}/{totalRelays} connected</span>
+            </Button>
           </div>
         )}
 
@@ -188,82 +192,6 @@ const LandingPage = () => {
             </div>
           </Card>
         </div>
-
-        {/* Nostr System Info */}
-        {!isLoading && systemParams && (
-          <Card className="mb-12 p-6">
-            <div className="mb-6 flex items-center gap-2">
-              <Wifi className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Connected to Nostr Network</h2>
-            </div>
-
-            <div className="grid gap-8 md:grid-cols-2">
-              {/* Relay Status */}
-              <div>
-                <h3 className="mb-4 text-lg font-semibold text-foreground">
-                  relays: {connectedRelays}/{totalRelays} connected
-                </h3>
-                <div className="space-y-2">
-                  {relayStatuses.map((relay) => (
-                    <div key={relay.url} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${relay.connected ? 'bg-success' : 'bg-destructive'}`} />
-                        <span className="font-mono text-sm text-foreground">{relay.url}</span>
-                      </div>
-                      {relay.latency && (
-                        <span className="text-sm text-success">{relay.latency}ms</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6">
-                  <h3 className="mb-3 text-lg font-semibold text-foreground">Exchange Rates:</h3>
-                  <div className="space-y-1 text-sm">
-                    <p className="text-foreground">EUR: {systemParams.fx.EUR.toFixed(4)} per LANA</p>
-                    <p className="text-foreground">USD: {systemParams.fx.USD.toFixed(4)} per LANA</p>
-                    <p className="text-foreground">GBP: {systemParams.fx.GBP.toFixed(4)} per LANA</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* System Info */}
-              <div>
-                <h3 className="mb-4 text-lg font-semibold text-foreground">System Info:</h3>
-                <div className="space-y-2 text-sm">
-                  <p className="text-foreground">Split: {systemParams.split}</p>
-                  <p className="text-foreground">Version: {systemParams.version}</p>
-                  <p className="text-foreground">
-                    Valid from: {new Date(parseInt(systemParams.valid_from) * 1000).toLocaleDateString()}
-                  </p>
-                </div>
-
-                <div className="mt-6">
-                  <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-foreground">
-                    <Lock className="h-5 w-5" />
-                    Trusted Signers
-                  </h3>
-                  <div className="space-y-2">
-                    {Object.entries(systemParams.trusted_signers).map(([key, signers]) => (
-                      <div key={key}>
-                        <p className="text-sm font-medium text-foreground">{key}:</p>
-                        {signers.length > 0 ? (
-                          signers.map((signer, idx) => (
-                            <p key={idx} className="truncate font-mono text-xs text-muted-foreground pl-4">
-                              {signer}
-                            </p>
-                          ))
-                        ) : (
-                          <p className="text-xs text-muted-foreground pl-4">No signers configured</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Feature Cards */}
         <div className="mb-12 grid gap-6 md:grid-cols-3">
@@ -367,6 +295,14 @@ const LandingPage = () => {
           <p>© 2025 Lana Register. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Nostr Status Dialog */}
+      <NostrStatusDialog
+        open={showStatusDialog}
+        onOpenChange={setShowStatusDialog}
+        systemParams={systemParams}
+        relayStatuses={relayStatuses}
+      />
     </div>
   );
 };
