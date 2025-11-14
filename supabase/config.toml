@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.sync-wallet-kind-30889]
 verify_jwt = false
+
+[functions.batch-wallet-import-kind-30889]
+verify_jwt = false
