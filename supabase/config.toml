@@ -2,3 +2,6 @@ project_id = "laluxmwarlejdwyboudz"
 
 [functions.sync-system-parameters]
 verify_jwt = false
+
+[functions.sync-wallet-kind-30889]
+verify_jwt = false
