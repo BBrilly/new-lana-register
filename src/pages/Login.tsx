@@ -1,20 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Key, Shield } from "lucide-react";
+import { Loader2, Key, Shield, QrCode } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
 import { convertWifToIds, storeAuthSession } from "@/utils/wifAuth";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const [wifKey, setWifKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerDivRef = useRef<HTMLDivElement>(null);
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +66,107 @@ const Login = () => {
     }
   };
 
+  const startScanning = async () => {
+    setIsScanning(true);
+    setError("");
+    
+    // CRITICAL: 100ms delay to ensure DOM is ready
+    setTimeout(async () => {
+      try {
+        // 1. Enumerate available cameras
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras || cameras.length === 0) {
+          toast({
+            title: "No camera found",
+            description: "No camera found on this device",
+            variant: "destructive",
+          });
+          setIsScanning(false);
+          return;
+        }
+
+        // 2. Select camera (priority: back camera)
+        let selectedCamera = cameras[0];
+        if (cameras.length > 1) {
+          const backCamera = cameras.find(camera => 
+            camera.label.toLowerCase().includes('back') || 
+            camera.label.toLowerCase().includes('rear')
+          );
+          if (backCamera) {
+            selectedCamera = backCamera;
+          }
+        }
+
+        // 3. Initialize scanner with unique ID
+        const scanner = new Html5Qrcode("qr-reader-login");
+        scannerRef.current = scanner;
+
+        // 4. Start scanner with camera.id
+        await scanner.start(
+          selectedCamera.id,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          },
+          (decodedText) => {
+            // Success callback - QR code scanned
+            setWifKey(decodedText);
+            stopScanning();
+            toast({
+              title: "QR code scanned",
+              description: "WIF key detected successfully",
+            });
+          },
+          (errorMessage) => {
+            // Error callback - ignore during operation
+          }
+        );
+      } catch (error: any) {
+        console.error("Error starting QR scanner:", error);
+        setIsScanning(false);
+        
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          toast({
+            title: "Permission denied",
+            description: "Camera permission denied. Please allow camera access in your browser settings.",
+            variant: "destructive",
+          });
+        } else if (error.name === "NotFoundError") {
+          toast({
+            title: "No camera",
+            description: "No camera found on this device",
+            variant: "destructive",
+          });
+        } else if (error.name === "NotReadableError") {
+          toast({
+            title: "Camera in use",
+            description: "Camera is already in use by another application",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: `Error starting camera: ${error.message || "Unknown error"}`,
+            variant: "destructive",
+          });
+        }
+      }
+    }, 100);
+  };
+
+  const stopScanning = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (error) {
+        console.error("Error stopping scanner:", error);
+      }
+    }
+    setIsScanning(false);
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -86,10 +200,39 @@ const Login = () => {
                   placeholder="Enter your WIF key"
                   value={wifKey}
                   onChange={(e) => setWifKey(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || isScanning}
                   className="font-mono"
                 />
               </div>
+
+              {!isScanning ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={startScanning}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Scan QR Code
+                </Button>
+              ) : (
+                <div className="space-y-4">
+                  <div
+                    id="qr-reader-login"
+                    ref={scannerDivRef}
+                    className="rounded-lg overflow-hidden border-2 border-primary"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={stopScanning}
+                    className="w-full"
+                  >
+                    Stop Scanning
+                  </Button>
+                </div>
+              )}
 
               {error && (
                 <Alert variant="destructive">
@@ -97,7 +240,7 @@ const Login = () => {
                 </Alert>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || isScanning}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
