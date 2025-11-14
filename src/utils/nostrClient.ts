@@ -56,11 +56,11 @@ export class NostrClient {
       limit: 1
     };
 
-    // Test relay connectivity and measure latency
+    // Test initial relay connectivity and measure latency
     const relayStatusPromises = RELAYS.map(async (url) => {
       const startTime = Date.now();
       try {
-        const relay = await this.pool.ensureRelay(url);
+        await this.pool.ensureRelay(url);
         const latency = Date.now() - startTime;
         const status: RelayStatus = { url, connected: true, latency };
         this.relayStatuses.set(url, status);
@@ -73,7 +73,7 @@ export class NostrClient {
       }
     });
 
-    const relayStatuses = await Promise.all(relayStatusPromises);
+    const initialRelayStatuses = await Promise.all(relayStatusPromises);
 
     // Fetch events from all connected relays
     const connectedRelays = RELAYS.filter(url => 
@@ -82,7 +82,7 @@ export class NostrClient {
 
     if (connectedRelays.length === 0) {
       console.error('No relays connected');
-      return { parameters: null, relayStatuses };
+      return { parameters: null, relayStatuses: initialRelayStatuses };
     }
 
     try {
@@ -90,7 +90,7 @@ export class NostrClient {
       
       if (events.length === 0) {
         console.warn('No kind 38888 events found');
-        return { parameters: null, relayStatuses };
+        return { parameters: null, relayStatuses: initialRelayStatuses };
       }
 
       // Get the latest event
@@ -99,23 +99,56 @@ export class NostrClient {
       // Verify the event
       if (!this.verifyEvent(latestEvent)) {
         console.error('Invalid event signature or pubkey');
-        return { parameters: null, relayStatuses };
+        return { parameters: null, relayStatuses: initialRelayStatuses };
       }
 
       // Parse content
       const parameters = this.parseEventContent(latestEvent);
       
-      // Store in session storage
-      if (parameters) {
-        sessionStorage.setItem('lana_system_parameters', JSON.stringify(parameters));
-        sessionStorage.setItem('lana_relay_statuses', JSON.stringify(relayStatuses));
+      if (!parameters) {
+        return { parameters: null, relayStatuses: initialRelayStatuses };
       }
 
-      return { parameters, relayStatuses };
+      // Now connect to ALL relays from the system parameters
+      const allRelayStatuses = await this.connectToAllRelays(parameters.relays);
+      
+      // Store in session storage
+      sessionStorage.setItem('lana_system_parameters', JSON.stringify(parameters));
+      sessionStorage.setItem('lana_relay_statuses', JSON.stringify(allRelayStatuses));
+
+      return { parameters, relayStatuses: allRelayStatuses };
     } catch (error) {
       console.error('Error fetching system parameters:', error);
-      return { parameters: null, relayStatuses };
+      return { parameters: null, relayStatuses: initialRelayStatuses };
     }
+  }
+
+  private async connectToAllRelays(relays: string[]): Promise<RelayStatus[]> {
+    console.log(`Connecting to ${relays.length} relays...`);
+    
+    const allRelayPromises = relays.map(async (url) => {
+      // Check if already tested
+      if (this.relayStatuses.has(url)) {
+        return this.relayStatuses.get(url)!;
+      }
+
+      const startTime = Date.now();
+      try {
+        await this.pool.ensureRelay(url);
+        const latency = Date.now() - startTime;
+        const status: RelayStatus = { url, connected: true, latency };
+        this.relayStatuses.set(url, status);
+        console.log(`✓ Connected to ${url} (${latency}ms)`);
+        return status;
+      } catch (error) {
+        console.error(`✗ Failed to connect to ${url}:`, error);
+        const status: RelayStatus = { url, connected: false };
+        this.relayStatuses.set(url, status);
+        return status;
+      }
+    });
+
+    return await Promise.all(allRelayPromises);
   }
 
   private verifyEvent(event: Event): boolean {
