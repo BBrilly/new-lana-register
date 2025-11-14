@@ -1,10 +1,12 @@
 import { ReactNode } from "react";
 import { NavLink } from "@/components/NavLink";
-import { Wallet, LayoutDashboard, LogOut } from "lucide-react";
+import { Wallet, LayoutDashboard, LogOut, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { logout, isAuthenticated } from "@/utils/wifAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+
 interface LayoutProps {
   children: ReactNode;
 }
@@ -13,9 +15,13 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const authenticated = isAuthenticated();
+  const { user, isAdmin, signOut } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     logout();
+    if (user) {
+      await signOut();
+    }
     toast({
       title: "Logged out",
       description: "You have been successfully logged out",
@@ -41,7 +47,13 @@ const Layout = ({ children }: LayoutProps) => {
                 <Wallet className="h-4 w-4" />
                 Wallets
               </NavLink>
-              {authenticated && (
+              {isAdmin && (
+                <NavLink to="/admin" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" activeClassName="bg-secondary text-foreground">
+                  <Shield className="h-4 w-4" />
+                  Admin
+                </NavLink>
+              )}
+              {(authenticated || user) && (
                 <Button
                   variant="ghost"
                   size="sm"
