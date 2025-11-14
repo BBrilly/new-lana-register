@@ -140,7 +140,13 @@ Deno.serve(async (req) => {
 
     let totalMainWallets = 0;
     let totalWallets = 0;
-    let errorCount = 0;
+    const errors: Array<{
+      customer_pubkey: string;
+      wallet_id: string | null;
+      wallet_type: string;
+      error_code: string;
+      error_message: string;
+    }> = [];
 
     // Process each event
     for (const parsed of parsedEvents) {
@@ -149,14 +155,41 @@ Deno.serve(async (req) => {
         totalMainWallets += counts.mainWalletCount;
         totalWallets += counts.totalWalletCount;
       } catch (error) {
-        console.error(`Error syncing wallets for ${parsed.customer_pubkey}:`, error);
-        errorCount++;
+        const mainWallet = parsed.wallets.find(w => w.wallet_type === 'Main');
+        const err = error as any;
+        const errorDetail = {
+          customer_pubkey: parsed.customer_pubkey.substring(0, 16) + '...',
+          wallet_id: mainWallet?.wallet_id || 'unknown',
+          wallet_type: mainWallet?.wallet_type || 'unknown',
+          error_code: err.code || 'UNKNOWN',
+          error_message: err.message || String(error)
+        };
+        errors.push(errorDetail);
+        console.error(`❌ Error syncing ${errorDetail.customer_pubkey}:`, {
+          wallet_id: errorDetail.wallet_id,
+          error_code: errorDetail.error_code,
+          error_message: errorDetail.error_message
+        });
       }
     }
 
     pool.close(relays);
 
-    console.log(`Batch completed: ${totalMainWallets} main wallets, ${totalWallets} total wallets, ${errorCount} errors`);
+    console.log(`Batch completed: ${totalMainWallets} main wallets, ${totalWallets} total wallets, ${errors.length} errors`);
+
+    // Format detailed error report
+    let errorReport = null;
+    if (errors.length > 0) {
+      errorReport = `❌ ${errors.length} napak pri sinhronizaciji:\n\n` + 
+        errors.map((e, i) => 
+          `${i + 1}. Customer: ${e.customer_pubkey}\n` +
+          `   Wallet ID: ${e.wallet_id}\n` +
+          `   Tip: ${e.wallet_type}\n` +
+          `   Napaka: [${e.error_code}] ${e.error_message}\n`
+        ).join('\n');
+      
+      console.log('\n📋 PODROBNO POROČILO O NAPAKAH:\n' + errorReport);
+    }
 
     // Update batch status
     await supabase
@@ -165,7 +198,7 @@ Deno.serve(async (req) => {
         status: 'completed',
         main_wallets_synced: totalMainWallets,
         total_wallets_synced: totalWallets,
-        error_message: errorCount > 0 ? `${errorCount} errors during sync` : null
+        error_message: errorReport
       })
       .eq('id', batch.id);
 
@@ -175,7 +208,8 @@ Deno.serve(async (req) => {
         batchId: batch.id,
         mainWallets: totalMainWallets,
         totalWallets: totalWallets,
-        errors: errorCount
+        errors: errors.length,
+        errorDetails: errors
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
