@@ -113,6 +113,17 @@ const LandingPage = () => {
                 <Activity className="mr-2 h-4 w-4" />
                 Nostr Standards
               </Button>
+              {!isLoading && systemParams && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowStatusDialog(true)}
+                  className="gap-2"
+                >
+                  <Wifi className="h-4 w-4 text-success" />
+                  <span className="font-medium">{connectedRelays}/{totalRelays} connected</span>
+                </Button>
+              )}
               <Button onClick={() => navigate("/dashboard")} size="sm">
                 Login
               </Button>
@@ -123,20 +134,6 @@ const LandingPage = () => {
 
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
-        {/* Nostr Connection Status - Clickable */}
-        {!isLoading && systemParams && (
-          <div className="mb-8 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => setShowStatusDialog(true)}
-              className="gap-2"
-            >
-              <Wifi className="h-4 w-4 text-success" />
-              <span className="font-medium">{connectedRelays}/{totalRelays} connected</span>
-            </Button>
-          </div>
-        )}
-
         <div className="mb-8 text-center">
           <h1 className="mb-4 text-6xl font-bold text-primary">Lana Register</h1>
           <p className="text-xl text-muted-foreground">

@@ -35,34 +35,54 @@ const NostrStatusDialog = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Relay Status */}
+          {/* All System Relays - Moved to Top */}
           <Card className="p-6">
             <h3 className="mb-4 text-lg font-semibold text-foreground">
-              relays: {connectedRelays}/{totalRelays} connected
+              All System Relays ({systemParams.relays.length}):
             </h3>
-            <div className="space-y-3">
-              {relayStatuses.map((relay) => (
-                <div
-                  key={relay.url}
-                  className="flex items-center justify-between rounded-lg bg-secondary/20 p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`h-3 w-3 rounded-full ${
-                        relay.connected ? "bg-success" : "bg-destructive"
-                      }`}
-                    />
-                    <span className="font-mono text-sm text-foreground">
-                      {relay.url}
-                    </span>
+            <div className="space-y-2">
+              {systemParams.relays.map((relay, idx) => {
+                const status = relayStatuses.find(r => r.url === relay);
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between rounded-lg bg-secondary/20 p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`h-3 w-3 rounded-full ${
+                          status?.connected ? "bg-success" : "bg-muted"
+                        }`}
+                      />
+                      <span className="font-mono text-sm text-foreground">
+                        {relay}
+                      </span>
+                    </div>
+                    {status?.latency && (
+                      <Badge variant="outline" className="bg-success/10 text-success">
+                        {status.latency}ms
+                      </Badge>
+                    )}
                   </div>
-                  {relay.latency && (
-                    <Badge variant="outline" className="bg-success/10 text-success">
-                      {relay.latency}ms
-                    </Badge>
-                  )}
-                </div>
-              ))}
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Connection Summary */}
+          <Card className="p-6">
+            <h3 className="mb-4 text-lg font-semibold text-foreground">
+              Connection Status: {connectedRelays}/{totalRelays} relays connected
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg bg-success/10 p-4">
+                <p className="text-sm text-muted-foreground">Connected Relays</p>
+                <p className="text-2xl font-bold text-success">{connectedRelays}</p>
+              </div>
+              <div className="rounded-lg bg-secondary/20 p-4">
+                <p className="text-sm text-muted-foreground">Total Relays</p>
+                <p className="text-2xl font-bold text-foreground">{totalRelays}</p>
+              </div>
             </div>
           </Card>
 
@@ -149,24 +169,6 @@ const NostrStatusDialog = ({
             </div>
           </Card>
 
-          {/* All Relays from System Parameters */}
-          {systemParams.relays.length > 0 && (
-            <Card className="p-6">
-              <h3 className="mb-4 text-lg font-semibold text-foreground">
-                All System Relays ({systemParams.relays.length}):
-              </h3>
-              <div className="space-y-2">
-                {systemParams.relays.map((relay, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-lg bg-secondary/20 p-3 font-mono text-sm text-foreground"
-                  >
-                    {relay}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
 
           {/* Electrum Servers */}
           {systemParams.electrum.length > 0 && (
