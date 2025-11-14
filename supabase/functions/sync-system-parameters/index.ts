@@ -215,56 +215,58 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check if this event already exists
+    // Check if any record exists (we only want one record in the table)
     const { data: existing } = await supabase
       .from('system_parameters')
-      .select('id')
-      .eq('event_id', event.id)
-      .single();
+      .select('id, event_id, version')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const newData = {
+      event_id: event.id,
+      pubkey: event.pubkey,
+      created_at: event.created_at,
+      relays: parameters.relays,
+      electrum: parameters.electrum,
+      fx: parameters.fx,
+      split: parameters.split,
+      version: parameters.version,
+      valid_from: parameters.valid_from,
+      trusted_signers: parameters.trusted_signers,
+      raw_event: event,
+      updated_at: new Date().toISOString()
+    };
+
+    let data;
+    let error;
 
     if (existing) {
-      console.log('Event already exists in database, updating timestamp');
-      const { error: updateError } = await supabase
+      // Update existing record
+      console.log(`Updating existing record (id: ${existing.id}, old version: ${existing.version}, new version: ${parameters.version})`);
+      
+      const result = await supabase
         .from('system_parameters')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('event_id', event.id);
-
-      if (updateError) {
-        console.error('Error updating timestamp:', updateError);
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'System parameters already up to date',
-          event_id: event.id,
-          version: parameters.version,
-          already_exists: true
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+        .update(newData)
+        .eq('id', existing.id)
+        .select()
+        .single();
+      
+      data = result.data;
+      error = result.error;
+    } else {
+      // Insert first record
+      console.log('Inserting first system parameters record');
+      
+      const result = await supabase
+        .from('system_parameters')
+        .insert(newData)
+        .select()
+        .single();
+      
+      data = result.data;
+      error = result.error;
     }
-
-    // Insert new record
-    const { data, error } = await supabase
-      .from('system_parameters')
-      .insert({
-        event_id: event.id,
-        pubkey: event.pubkey,
-        created_at: event.created_at,
-        relays: parameters.relays,
-        electrum: parameters.electrum,
-        fx: parameters.fx,
-        split: parameters.split,
-        version: parameters.version,
-        valid_from: parameters.valid_from,
-        trusted_signers: parameters.trusted_signers,
-        raw_event: event
-      })
-      .select()
-      .single();
 
     if (error) {
       console.error('Database error:', error);
