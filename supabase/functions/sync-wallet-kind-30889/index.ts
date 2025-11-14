@@ -202,8 +202,8 @@ async function syncWallets(supabase: any, parsed: ParsedEvent) {
 
   console.log(`Syncing ${wallets.length} wallets for customer ${customer_pubkey.substring(0, 8)}...`);
 
-  // Find Main wallet
-  const mainWallet = wallets.find(w => w.wallet_type === 'Main');
+  // Find Main wallet (checking for both "Main" and "Main Wallet")
+  const mainWallet = wallets.find(w => w.wallet_type === 'Main' || w.wallet_type === 'Main Wallet');
   
   if (!mainWallet) {
     console.warn(`No Main wallet found for customer ${customer_pubkey}`);
