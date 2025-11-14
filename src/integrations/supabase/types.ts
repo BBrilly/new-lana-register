@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      main_wallets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          nostr_hex_id: string
+          profile_pic_link: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          nostr_hex_id: string
+          profile_pic_link?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          nostr_hex_id?: string
+          profile_pic_link?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       system_parameters: {
         Row: {
           created_at: number
@@ -64,6 +94,41 @@ export type Database = {
           version?: string
         }
         Relationships: []
+      }
+      wallets: {
+        Row: {
+          created_at: string
+          id: string
+          main_wallet_id: string
+          notes: string | null
+          updated_at: string
+          wallet_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          main_wallet_id: string
+          notes?: string | null
+          updated_at?: string
+          wallet_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          main_wallet_id?: string
+          notes?: string | null
+          updated_at?: string
+          wallet_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallets_main_wallet_id_fkey"
+            columns: ["main_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "main_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
