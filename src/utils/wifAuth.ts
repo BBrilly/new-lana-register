@@ -170,6 +170,20 @@ export interface WifAuthResult {
   nostrPrivateKey: string;
 }
 
+export interface UserProfile {
+  name: string;
+  display_name?: string;
+  about?: string;
+  picture?: string;
+  location?: string;
+  country?: string;
+  currency?: string;
+  lanaWalletID?: string;
+  whoAreYou?: string;
+  language?: string;
+  [key: string]: any;
+}
+
 // Main function to convert WIF to all derived identifiers
 export async function convertWifToIds(wif: string): Promise<WifAuthResult> {
   try {
@@ -214,13 +228,27 @@ export function getAuthSession(): WifAuthResult | null {
   return JSON.parse(authData);
 }
 
-// Check if user is authenticated
+// Check if user is authenticated (requires both auth and profile)
 export function isAuthenticated(): boolean {
-  return sessionStorage.getItem('lana_authenticated') === 'true';
+  const hasAuth = sessionStorage.getItem('lana_authenticated') === 'true';
+  const hasProfile = sessionStorage.getItem('lana_user_profile') !== null;
+  return hasAuth && hasProfile;
+}
+
+// Store user profile in session
+export function storeUserProfile(profile: UserProfile): void {
+  sessionStorage.setItem('lana_user_profile', JSON.stringify(profile));
+}
+
+// Get user profile from session
+export function getUserProfile(): UserProfile | null {
+  const profile = sessionStorage.getItem('lana_user_profile');
+  return profile ? JSON.parse(profile) : null;
 }
 
 // Logout
 export function logout(): void {
   sessionStorage.removeItem('lana_auth');
   sessionStorage.removeItem('lana_authenticated');
+  sessionStorage.removeItem('lana_user_profile');
 }
