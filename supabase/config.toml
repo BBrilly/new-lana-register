@@ -1,1 +1,4 @@
 project_id = "laluxmwarlejdwyboudz"
+
+[functions.sync-system-parameters]
+verify_jwt = false
