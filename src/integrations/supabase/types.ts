@@ -14,7 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      system_parameters: {
+        Row: {
+          created_at: number
+          electrum: Json
+          event_id: string
+          fetched_at: string | null
+          fx: Json
+          id: string
+          pubkey: string
+          raw_event: Json
+          relays: Json
+          split: string
+          trusted_signers: Json
+          updated_at: string | null
+          valid_from: string
+          version: string
+        }
+        Insert: {
+          created_at: number
+          electrum: Json
+          event_id: string
+          fetched_at?: string | null
+          fx: Json
+          id?: string
+          pubkey: string
+          raw_event: Json
+          relays: Json
+          split: string
+          trusted_signers: Json
+          updated_at?: string | null
+          valid_from: string
+          version: string
+        }
+        Update: {
+          created_at?: number
+          electrum?: Json
+          event_id?: string
+          fetched_at?: string | null
+          fx?: Json
+          id?: string
+          pubkey?: string
+          raw_event?: Json
+          relays?: Json
+          split?: string
+          trusted_signers?: Json
+          updated_at?: string | null
+          valid_from?: string
+          version?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
