@@ -69,7 +69,7 @@ const Layout = ({ children }: LayoutProps) => {
                 Wallets
               </NavLink>
               {isAdmin && (
-                <NavLink to="/admin" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" activeClassName="bg-secondary text-foreground">
+                <NavLink to="/admin" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700" activeClassName="bg-red-700 text-white">
                   <Shield className="h-4 w-4" />
                   Admin
                 </NavLink>
