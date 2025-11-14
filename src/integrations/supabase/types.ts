@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          id: string
+          nostr_hex_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nostr_hex_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nostr_hex_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       main_wallets: {
         Row: {
           created_at: string
@@ -147,7 +168,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
