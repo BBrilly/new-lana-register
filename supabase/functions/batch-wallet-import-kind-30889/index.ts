@@ -103,18 +103,14 @@ Deno.serve(async (req) => {
     // Create Nostr pool
     const pool = new SimplePool();
 
-    // Convert dates to Unix timestamps
-    const sinceTimestamp = Math.floor(new Date(batch.start_date).getTime() / 1000);
-    const untilTimestamp = Math.floor(new Date(batch.end_date).getTime() / 1000);
-    
+    // Fetch ALL events (not filtered by time - we get all historical data)
+    // Batch dates are only for tracking progress, not for filtering events
     const filter: Filter = {
       kinds: [30889],
-      authors: registrarPubkeys,
-      since: sinceTimestamp,
-      until: untilTimestamp
+      authors: registrarPubkeys
     };
 
-    console.log(`Fetching KIND 30889 events from ${batch.start_date} to ${batch.end_date}...`);
+    console.log(`Fetching ALL KIND 30889 events for batch ${batch.start_date} to ${batch.end_date}...`);
     
     const events = await pool.querySync(relays, filter);
     console.log(`Found ${events.length} events in this batch`);
