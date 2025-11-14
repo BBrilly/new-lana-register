@@ -21,8 +21,10 @@ export type Database = {
           name: string
           nostr_hex_id: string
           profile_pic_link: string | null
+          status: string | null
           updated_at: string
           user_id: string
+          wallet_id: string | null
         }
         Insert: {
           created_at?: string
@@ -30,8 +32,10 @@ export type Database = {
           name: string
           nostr_hex_id: string
           profile_pic_link?: string | null
+          status?: string | null
           updated_at?: string
           user_id: string
+          wallet_id?: string | null
         }
         Update: {
           created_at?: string
@@ -39,8 +43,10 @@ export type Database = {
           name?: string
           nostr_hex_id?: string
           profile_pic_link?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string
+          wallet_id?: string | null
         }
         Relationships: []
       }
@@ -97,27 +103,33 @@ export type Database = {
       }
       wallets: {
         Row: {
+          amount_unregistered_lanoshi: number | null
           created_at: string
           id: string
           main_wallet_id: string
           notes: string | null
           updated_at: string
+          wallet_id: string | null
           wallet_type: string
         }
         Insert: {
+          amount_unregistered_lanoshi?: number | null
           created_at?: string
           id?: string
           main_wallet_id: string
           notes?: string | null
           updated_at?: string
+          wallet_id?: string | null
           wallet_type: string
         }
         Update: {
+          amount_unregistered_lanoshi?: number | null
           created_at?: string
           id?: string
           main_wallet_id?: string
           notes?: string | null
           updated_at?: string
+          wallet_id?: string | null
           wallet_type?: string
         }
         Relationships: [
