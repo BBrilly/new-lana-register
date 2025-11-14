@@ -1,13 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import StatCard from "@/components/StatCard";
 import AddWalletDialog from "@/components/AddWalletDialog";
 import { MOCK_WALLETS, EUR_CONVERSION_RATE } from "@/data/mockData";
 import { Wallet } from "@/types/wallet";
 import { Wallet as WalletIcon, TrendingUp, Euro, Activity } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { isAuthenticated, getAuthSession } from "@/utils/wifAuth";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [wallets] = useState<Wallet[]>(MOCK_WALLETS);
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  const authSession = getAuthSession();
 
   const totalLan = wallets.reduce((sum, wallet) => sum + wallet.lanAmount, 0);
   const totalEur = wallets.reduce((sum, wallet) => sum + wallet.eurAmount, 0);
@@ -26,6 +39,27 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="space-y-8">
+        {/* User Info Card */}
+        {authSession && (
+          <Card className="p-6 bg-primary/5 border-primary/20">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Authenticated Session</h2>
+            <div className="grid gap-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Wallet ID:</span>
+                <p className="font-mono text-foreground mt-1 break-all">{authSession.walletId}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Nostr ID (HEX):</span>
+                <p className="font-mono text-xs text-foreground mt-1 break-all">{authSession.nostrHexId}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Nostr ID (npub):</span>
+                <p className="font-mono text-xs text-foreground mt-1 break-all">{authSession.nostrNpubId}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
