@@ -35,6 +35,42 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_wallet_import_status: {
+        Row: {
+          created_at: string
+          end_date: string
+          error_message: string | null
+          id: string
+          main_wallets_synced: number | null
+          start_date: string
+          status: string
+          total_wallets_synced: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          error_message?: string | null
+          id?: string
+          main_wallets_synced?: number | null
+          start_date: string
+          status?: string
+          total_wallets_synced?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          error_message?: string | null
+          id?: string
+          main_wallets_synced?: number | null
+          start_date?: string
+          status?: string
+          total_wallets_synced?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       main_wallets: {
         Row: {
           created_at: string
