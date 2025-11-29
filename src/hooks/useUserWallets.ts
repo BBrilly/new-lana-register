@@ -2,11 +2,15 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Wallet } from "@/types/wallet";
 import { getAuthSession } from "@/utils/wifAuth";
+import { useWalletBalances } from "./useWalletBalances";
+import { EUR_CONVERSION_RATE } from "@/data/mockData";
 
 export const useUserWallets = () => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [walletIds, setWalletIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { balances, isLoading: isLoadingBalances } = useWalletBalances(walletIds);
 
   useEffect(() => {
     const fetchWallets = async () => {
@@ -57,14 +61,20 @@ export const useUserWallets = () => {
           throw walletsError;
         }
 
+        // Extract wallet IDs for balance fetching
+        const ids = (walletsData || [])
+          .map((w) => w.wallet_id)
+          .filter((id): id is string => id !== null);
+        setWalletIds(ids);
+
         // Map database data to Wallet interface
         const mappedWallets: Wallet[] = (walletsData || []).map((w) => ({
           id: w.id,
           walletNumber: w.wallet_id || "N/A",
           type: w.wallet_type,
           description: w.notes || "No description",
-          lanAmount: 0, // MOCK - will be implemented later
-          eurAmount: 0, // MOCK - will be implemented later
+          lanAmount: 0, // Will be updated when balances are loaded
+          eurAmount: 0, // Will be updated when balances are loaded
           events: [], // MOCK - will be implemented later
           notification: undefined, // MOCK - will be implemented later
         }));
@@ -92,5 +102,20 @@ export const useUserWallets = () => {
     fetchWallets();
   }, []);
 
-  return { wallets, isLoading, error };
+  // Update wallet balances when balances are loaded
+  useEffect(() => {
+    if (balances.size > 0 && wallets.length > 0) {
+      const updatedWallets = wallets.map((wallet) => {
+        const balance = balances.get(wallet.walletNumber) || 0;
+        return {
+          ...wallet,
+          lanAmount: balance,
+          eurAmount: balance * EUR_CONVERSION_RATE,
+        };
+      });
+      setWallets(updatedWallets);
+    }
+  }, [balances]);
+
+  return { wallets, isLoading: isLoading || isLoadingBalances, error };
 };
