@@ -12,16 +12,27 @@ interface WalletCardProps {
 
 const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case "Hardware":
-        return "bg-success/10 text-success";
-      case "Software":
-        return "bg-primary/10 text-primary";
-      case "Exchange":
-        return "bg-warning/10 text-warning";
-      default:
-        return "bg-muted text-muted-foreground";
+    const lowerType = type.toLowerCase();
+    
+    if (lowerType.includes("main")) {
+      return "bg-success/10 text-success";
+    } else if (lowerType.includes("savings")) {
+      return "bg-primary/10 text-primary";
+    } else if (lowerType.includes("business")) {
+      return "bg-purple-500/10 text-purple-500";
+    } else if (lowerType.includes("lana8wonder")) {
+      return "bg-orange-500/10 text-orange-500";
+    } else if (lowerType.includes("lanapays")) {
+      return "bg-red-500/10 text-red-500";
+    } else if (lowerType.includes("hardware")) {
+      return "bg-success/10 text-success";
+    } else if (lowerType.includes("software")) {
+      return "bg-primary/10 text-primary";
+    } else if (lowerType.includes("exchange")) {
+      return "bg-warning/10 text-warning";
     }
+    
+    return "bg-muted text-muted-foreground";
   };
 
   const getNotificationIcon = (type: string) => {

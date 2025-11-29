@@ -1,7 +1,7 @@
 export interface Wallet {
   id: string;
   walletNumber: string;
-  type: "Hardware" | "Software" | "Exchange";
+  type: string;
   description: string;
   lanAmount: number;
   eurAmount: number;

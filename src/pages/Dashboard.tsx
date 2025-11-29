@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import StatCard from "@/components/StatCard";
 import AddWalletDialog from "@/components/AddWalletDialog";
-import { MOCK_WALLETS, EUR_CONVERSION_RATE } from "@/data/mockData";
-import { Wallet } from "@/types/wallet";
+import { EUR_CONVERSION_RATE } from "@/data/mockData";
 import { Wallet as WalletIcon, TrendingUp, Euro, Activity } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { isAuthenticated, getAuthSession, getUserProfile } from "@/utils/wifAuth";
+import { useUserWallets } from "@/hooks/useUserWallets";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [wallets] = useState<Wallet[]>(MOCK_WALLETS);
+  const { wallets, isLoading, error } = useUserWallets();
 
   // Check authentication on mount
   useEffect(() => {
@@ -111,38 +111,54 @@ const Dashboard = () => {
         <div className="rounded-xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-foreground">Quick Wallet Overview</h2>
           <div className="mt-4 space-y-3">
-            {wallets.map((wallet) => (
-              <div
-                key={wallet.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-background p-4 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <WalletIcon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{wallet.description}</p>
-                    <p className="text-sm text-muted-foreground">{wallet.type}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-foreground">
-                    {wallet.lanAmount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    LAN
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    €{" "}
-                    {wallet.eurAmount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </>
+            ) : error ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Error loading wallets: {error}</p>
               </div>
-            ))}
+            ) : wallets.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No wallets found</p>
+              </div>
+            ) : (
+              wallets.map((wallet) => (
+                <div
+                  key={wallet.id}
+                  className="flex items-center justify-between rounded-lg border border-border bg-background p-4 transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <WalletIcon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{wallet.description}</p>
+                      <p className="text-sm text-muted-foreground">{wallet.type}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold text-foreground">
+                      {wallet.lanAmount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      LAN
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      €{" "}
+                      {wallet.eurAmount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
