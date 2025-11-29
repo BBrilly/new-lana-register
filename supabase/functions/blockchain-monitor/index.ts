@@ -97,7 +97,8 @@ Deno.serve(async (req) => {
       .limit(1)
       .single();
 
-    const lastProcessedHeight = lastBlock?.block_id || 0;
+    // If no records exist, start from last 1000 blocks (approximately last week)
+    const lastProcessedHeight = lastBlock?.block_id || Math.max(0, currentHeight - 1000);
     console.log(`Last processed height: ${lastProcessedHeight}`);
 
     // Calculate missing blocks
