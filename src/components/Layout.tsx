@@ -60,7 +60,7 @@ const Layout = ({ children }: LayoutProps) => {
               <span className="text-xl font-semibold text-foreground">Decentralised Lana Register</span>
             </div>
             <div className="flex gap-1">
-              <NavLink to="/" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" activeClassName="bg-secondary text-foreground">
+              <NavLink to="/dashboard" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" activeClassName="bg-secondary text-foreground">
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
               </NavLink>
