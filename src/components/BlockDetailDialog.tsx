@@ -11,6 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Database, Activity, TrendingUp, Package } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface BlockDetailDialogProps {
   open: boolean;
@@ -36,11 +45,14 @@ interface BlockTransaction {
 const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDetailDialogProps) => {
   const [transactions, setTransactions] = useState<BlockTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const TRANSACTIONS_PER_PAGE = 50;
 
   useEffect(() => {
     if (open) {
       // Mock data - in production this would fetch from RPC node or database
       setIsLoading(true);
+      setCurrentPage(1); // Reset to first page when opening
       setTimeout(() => {
         // Generate mock transaction data for demonstration
         const mockTransactions: BlockTransaction[] = Array.from(
@@ -63,6 +75,40 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
   const totalOutputs = transactions.reduce((sum, tx) => sum + tx.outputs, 0);
   const totalValue = transactions.reduce((sum, tx) => sum + tx.totalValue, 0);
   const avgOutputsPerTx = transactions.length > 0 ? (totalOutputs / transactions.length).toFixed(1) : 0;
+
+  // Pagination logic
+  const totalPages = Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE);
+  const startIndex = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
+  const endIndex = startIndex + TRANSACTIONS_PER_PAGE;
+  const currentTransactions = transactions.slice(startIndex, endIndex);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 10;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 6) {
+        for (let i = 1; i <= 8; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 5) {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = totalPages - 7; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = currentPage - 2; i <= currentPage + 2; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,9 +224,9 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transactions.map((tx, index) => (
+                    {currentTransactions.map((tx, index) => (
                       <TableRow key={tx.txid}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-medium">{startIndex + index + 1}</TableCell>
                         <TableCell className="font-mono text-xs">
                           {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
                         </TableCell>
@@ -202,6 +248,50 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                     ))}
                   </TableBody>
                 </Table>
+                
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {startIndex + 1} to {Math.min(endIndex, transactions.length)} of {transactions.length} transactions
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        
+                        {getPageNumbers().map((page, idx) => (
+                          page === 'ellipsis' ? (
+                            <PaginationItem key={`ellipsis-${idx}`}>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          ) : (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => setCurrentPage(page as number)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          )
+                        ))}
+                        
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
               </div>
             )}
           </Card>
