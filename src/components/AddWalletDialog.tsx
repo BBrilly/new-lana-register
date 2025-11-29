@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Html5Qrcode } from "html5-qrcode";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Plus, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
 interface AddWalletDialogProps {
@@ -36,6 +37,9 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
   const [walletTypes, setWalletTypes] = useState<{ id: string; name: string }[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerDivRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchWalletTypes = async () => {
@@ -58,6 +62,15 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
     fetchWalletTypes();
   }, []);
 
+  // Cleanup scanner on unmount or dialog close
+  useEffect(() => {
+    if (!open && scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+      setIsScanning(false);
+    }
+  }, [open]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletNumber || !description) {
@@ -70,6 +83,77 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
     setType(walletTypes.length > 0 ? walletTypes[0].name : "");
     setOpen(false);
     toast.success("Wallet successfully added!");
+  };
+
+  const startScanning = async () => {
+    setIsScanning(true);
+    
+    setTimeout(async () => {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras || cameras.length === 0) {
+          toast.error("No camera found on this device");
+          setIsScanning(false);
+          return;
+        }
+
+        let selectedCamera = cameras[0];
+        if (cameras.length > 1) {
+          const backCamera = cameras.find(camera => 
+            camera.label.toLowerCase().includes('back') || 
+            camera.label.toLowerCase().includes('rear')
+          );
+          if (backCamera) {
+            selectedCamera = backCamera;
+          }
+        }
+
+        const scanner = new Html5Qrcode("qr-reader-wallet");
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          selectedCamera.id,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          },
+          (decodedText) => {
+            setWalletNumber(decodedText);
+            stopScanning();
+            toast.success("Wallet ID scanned successfully");
+          },
+          (errorMessage) => {
+            // Ignore during operation
+          }
+        );
+      } catch (error: any) {
+        console.error("Error starting QR scanner:", error);
+        setIsScanning(false);
+        
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          toast.error("Camera permission denied. Please allow camera access.");
+        } else if (error.name === "NotFoundError") {
+          toast.error("No camera found on this device");
+        } else if (error.name === "NotReadableError") {
+          toast.error("Camera is already in use by another application");
+        } else {
+          toast.error(`Error starting camera: ${error.message || "Unknown error"}`);
+        }
+      }
+    }, 100);
+  };
+
+  const stopScanning = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (error) {
+        console.error("Error stopping scanner:", error);
+      }
+    }
+    setIsScanning(false);
   };
 
   return (
@@ -92,11 +176,39 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
             <Label htmlFor="walletNumber">Wallet Number</Label>
             <Input
               id="walletNumber"
-              placeholder="0x..."
+              placeholder="LZgUUQALhZbCoQrUXEDDwJS1Pb99E1bJ27..."
               value={walletNumber}
               onChange={(e) => setWalletNumber(e.target.value)}
               className="font-mono"
+              disabled={isScanning}
             />
+            {!isScanning ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={startScanning}
+                className="w-full gap-2"
+              >
+                <QrCode className="h-4 w-4" />
+                Scan Wallet QR Code
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <div
+                  id="qr-reader-wallet"
+                  ref={scannerDivRef}
+                  className="rounded-lg overflow-hidden border-2 border-primary"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={stopScanning}
+                  className="w-full"
+                >
+                  Stop Scanning
+                </Button>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Wallet Type</Label>
@@ -124,10 +236,10 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isScanning}>
               Cancel
             </Button>
-            <Button type="submit">Add Wallet</Button>
+            <Button type="submit" disabled={isScanning}>Add Wallet</Button>
           </div>
         </form>
       </DialogContent>
