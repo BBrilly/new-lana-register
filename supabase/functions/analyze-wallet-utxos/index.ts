@@ -151,6 +151,13 @@ serve(async (req) => {
         total_utxos: utxos.length,
         total_value: totalValue,
         total_value_lana: (totalValue / 100000000).toFixed(8),
+        all_utxos: sortedUTXOs.map((utxo: any) => ({
+          tx_hash: utxo.tx_hash,
+          tx_pos: utxo.tx_pos,
+          height: utxo.height,
+          value: utxo.value,
+          value_lana: (utxo.value / 100000000).toFixed(8)
+        })),
         largest_utxos: largestUtxos,
         dust_count: dustUtxos.length,
         dust_value: dustValue,

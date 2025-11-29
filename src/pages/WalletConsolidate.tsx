@@ -4,22 +4,27 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, Sparkles, AlertTriangle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Package, Sparkles, AlertTriangle, Key, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+interface UTXO {
+  tx_hash: string;
+  tx_pos: number;
+  height: number;
+  value: number;
+  value_lana: string;
+}
 
 interface UTXOAnalysis {
   success: boolean;
   total_utxos: number;
   total_value: number;
   total_value_lana: string;
-  largest_utxos: Array<{
-    tx_hash: string;
-    tx_pos: number;
-    height: number;
-    value: number;
-    value_lana: string;
-  }>;
+  all_utxos: UTXO[];
+  largest_utxos: UTXO[];
   dust_count: number;
   dust_value: number;
   dust_value_lana: string;
@@ -31,12 +36,22 @@ interface UTXOAnalysis {
   message?: string;
 }
 
+interface Batch {
+  id: number;
+  utxos: UTXO[];
+  totalValue: number;
+  totalValueLana: string;
+  dustCount: number;
+}
+
 const WalletConsolidate = () => {
   const { walletId } = useParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [analysis, setAnalysis] = useState<UTXOAnalysis | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>("");
+  const [privateKey, setPrivateKey] = useState<string>("");
+  const [batches, setBatches] = useState<Batch[]>([]);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -90,6 +105,37 @@ const WalletConsolidate = () => {
         if (error) throw error;
 
         setAnalysis(data);
+
+        // Create batches from all UTXOs (mixed dust and non-dust)
+        if (data.all_utxos && data.all_utxos.length > 0) {
+          const allUtxos = [...data.all_utxos];
+          
+          // Shuffle UTXOs to mix dust and non-dust
+          for (let i = allUtxos.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allUtxos[i], allUtxos[j]] = [allUtxos[j], allUtxos[i]];
+          }
+
+          // Split into batches of 30
+          const batchSize = 30;
+          const createdBatches: Batch[] = [];
+          
+          for (let i = 0; i < allUtxos.length; i += batchSize) {
+            const batchUtxos = allUtxos.slice(i, i + batchSize);
+            const totalValue = batchUtxos.reduce((sum, utxo) => sum + utxo.value, 0);
+            const dustCount = batchUtxos.filter(utxo => utxo.value < 10000).length;
+            
+            createdBatches.push({
+              id: Math.floor(i / batchSize) + 1,
+              utxos: batchUtxos,
+              totalValue,
+              totalValueLana: (totalValue / 100000000).toFixed(8),
+              dustCount
+            });
+          }
+
+          setBatches(createdBatches);
+        }
       } catch (error) {
         console.error("Error fetching UTXO analysis:", error);
         toast.error(
@@ -131,6 +177,14 @@ const WalletConsolidate = () => {
     );
   }
 
+  const handleConsolidateBatch = (batchId: number) => {
+    if (!privateKey.trim()) {
+      toast.error("Please enter your private key first");
+      return;
+    }
+    toast.info(`Batch ${batchId} consolidation will be implemented next`);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -153,6 +207,31 @@ const WalletConsolidate = () => {
             </p>
           </div>
         </div>
+
+        {/* Private Key Input */}
+        <Card className="p-6 border-primary/50">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-primary/10 p-3">
+              <Key className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="privateKey" className="text-base font-semibold">
+                Wallet Private Key
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Enter your private key to authorize consolidation transactions. Your key is never sent to our servers.
+              </p>
+              <Input
+                id="privateKey"
+                type="password"
+                placeholder="Enter your private key (WIF format)"
+                value={privateKey}
+                onChange={(e) => setPrivateKey(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+          </div>
+        </Card>
 
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -268,6 +347,63 @@ const WalletConsolidate = () => {
             </table>
           </div>
         </Card>
+
+        {/* Consolidation Batches */}
+        {batches.length > 0 && (
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="rounded-lg bg-accent/10 p-3">
+                <Layers className="h-6 w-6 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold">Consolidation Batches</h2>
+                <p className="text-sm text-muted-foreground">
+                  {batches.length} batches of mixed UTXOs (30 UTXOs each)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {batches.map((batch) => (
+                <Card key={batch.id} className="p-4 border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-lg">Batch #{batch.id}</h3>
+                        <span className="text-sm px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                          {batch.utxos.length} UTXOs
+                        </span>
+                        {batch.dustCount > 0 && (
+                          <span className="text-sm px-2 py-1 rounded-full bg-destructive/10 text-destructive">
+                            {batch.dustCount} dust
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="text-muted-foreground">
+                          Total Value:
+                        </span>
+                        <span className="font-mono font-semibold text-primary">
+                          {batch.totalValueLana} LAN
+                        </span>
+                        <span className="text-muted-foreground">
+                          ({batch.totalValue.toLocaleString()} satoshis)
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleConsolidateBatch(batch.id)}
+                      disabled={!privateKey.trim()}
+                      className="ml-4"
+                    >
+                      Consolidate
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Recommendations */}
         {analysis.dust_count > 0 && (
