@@ -2,15 +2,45 @@ import { Wallet } from "@/types/wallet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
+import { useState } from "react";
 
 interface WalletCardProps {
   wallet: Wallet;
   onDelete: (id: string) => void;
+  userCurrency: string;
+  fxRates: { EUR: number; GBP: number; USD: number } | null;
 }
 
-const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
+const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps) => {
+  const [copied, setCopied] = useState(false);
+
+  const getCurrencySymbol = (currency: string) => {
+    switch (currency) {
+      case "EUR": return "€";
+      case "USD": return "$";
+      case "GBP": return "£";
+      default: return currency;
+    }
+  };
+
+  const currencySymbol = getCurrencySymbol(userCurrency);
+  const exchangeRate = fxRates?.[userCurrency as keyof typeof fxRates] || 0;
+  const fiatAmount = wallet.lanAmount * exchangeRate;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(wallet.walletNumber);
+      setCopied(true);
+      toast.success("Wallet ID copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
   const getTypeColor = (type: string) => {
     const lowerType = type.toLowerCase();
     
@@ -72,7 +102,17 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
                 {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{wallet.description}</p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">ID: {wallet.walletNumber}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="font-mono text-xs text-muted-foreground">ID: {wallet.walletNumber}</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  onClick={handleCopy}
+                >
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </Button>
+              </div>
             </div>
           </div>
           <Button
@@ -97,15 +137,15 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
             <p className="mt-0.5 text-xs text-muted-foreground">LAN</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-4">
-            <p className="text-xs font-medium text-muted-foreground">EUR Value</p>
+            <p className="text-xs font-medium text-muted-foreground">{userCurrency} Value</p>
             <p className="mt-1 text-2xl font-bold text-foreground">
-              €{" "}
-              {wallet.eurAmount.toLocaleString("en-US", {
+              {currencySymbol}{" "}
+              {fiatAmount.toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </p>
-            <p className="mt-0.5 text-xs text-success">+2.5%</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Rate: 1 LAN = {exchangeRate.toFixed(6)} {userCurrency}</p>
           </div>
         </div>
 
