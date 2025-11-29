@@ -71,6 +71,36 @@ export type Database = {
         }
         Relationships: []
       }
+      block_tx: {
+        Row: {
+          all_block_transactions: number
+          block_id: number
+          created_at: string
+          id: string
+          time_audit: string
+          time_staked: string
+          transaction_including_registered_wallets: number
+        }
+        Insert: {
+          all_block_transactions?: number
+          block_id: number
+          created_at?: string
+          id?: string
+          time_audit?: string
+          time_staked: string
+          transaction_including_registered_wallets?: number
+        }
+        Update: {
+          all_block_transactions?: number
+          block_id?: number
+          created_at?: string
+          id?: string
+          time_audit?: string
+          time_staked?: string
+          transaction_including_registered_wallets?: number
+        }
+        Relationships: []
+      }
       main_wallets: {
         Row: {
           created_at: string
@@ -154,6 +184,98 @@ export type Database = {
           version?: string
         }
         Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          block_id: number | null
+          created_at: string | null
+          from_wallet_id: string | null
+          id: string
+          notes: string | null
+          to_wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          block_id?: number | null
+          created_at?: string | null
+          from_wallet_id?: string | null
+          id?: string
+          notes?: string | null
+          to_wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          block_id?: number | null
+          created_at?: string | null
+          from_wallet_id?: string | null
+          id?: string
+          notes?: string | null
+          to_wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_from_wallet_id_fkey"
+            columns: ["from_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_to_wallet_id_fkey"
+            columns: ["to_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unregistered_lana_events: {
+        Row: {
+          detected_at: string | null
+          id: string
+          nostr_event_id: string | null
+          notes: string | null
+          return_amount_unregistered_lana: number | null
+          return_transaction_date: string | null
+          return_transaction_id: string | null
+          return_wallet_id: string | null
+          unregistered_amount: number
+          wallet_id: string
+        }
+        Insert: {
+          detected_at?: string | null
+          id?: string
+          nostr_event_id?: string | null
+          notes?: string | null
+          return_amount_unregistered_lana?: number | null
+          return_transaction_date?: string | null
+          return_transaction_id?: string | null
+          return_wallet_id?: string | null
+          unregistered_amount: number
+          wallet_id: string
+        }
+        Update: {
+          detected_at?: string | null
+          id?: string
+          nostr_event_id?: string | null
+          notes?: string | null
+          return_amount_unregistered_lana?: number | null
+          return_transaction_date?: string | null
+          return_transaction_id?: string | null
+          return_wallet_id?: string | null
+          unregistered_amount?: number
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unregistered_lana_events_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallet_types: {
         Row: {
