@@ -134,6 +134,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rpc_nodes: {
+        Row: {
+          created_at: string
+          description: string | null
+          host: string
+          id: string
+          name: string
+          password: string | null
+          port: number
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          host: string
+          id?: string
+          name: string
+          password?: string | null
+          port: number
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          host?: string
+          id?: string
+          name?: string
+          password?: string | null
+          port?: number
+          username?: string | null
+        }
+        Relationships: []
+      }
       system_parameters: {
         Row: {
           created_at: number
