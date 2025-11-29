@@ -134,38 +134,54 @@ const Dashboard = () => {
                 <p>No wallets found</p>
               </div>
             ) : (
-              wallets.map((wallet) => (
-                <div
-                  key={wallet.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-background p-4 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <WalletIcon className="h-5 w-5 text-primary" />
+              wallets.map((wallet) => {
+                const isMainWallet = wallet.type.toLowerCase().includes("main");
+                const isLana8Wonder = wallet.type.toLowerCase().includes("lana8wonder");
+                
+                return (
+                  <div
+                    key={wallet.id}
+                    className={`flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50 ${
+                      isMainWallet 
+                        ? "border-success/50 bg-success/5" 
+                        : isLana8Wonder 
+                        ? "border-orange-500/50 bg-orange-500/5" 
+                        : "border-border bg-background"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                        isMainWallet ? "bg-success/10" : isLana8Wonder ? "bg-orange-500/10" : "bg-primary/10"
+                      }`}>
+                        <WalletIcon className={`h-5 w-5 ${
+                          isMainWallet ? "text-success" : isLana8Wonder ? "text-orange-500" : "text-primary"
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{wallet.type}</p>
+                        <p className="text-sm text-muted-foreground">{wallet.description}</p>
+                        <p className="font-mono text-xs text-muted-foreground">ID: {wallet.walletNumber}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{wallet.description}</p>
-                      <p className="text-sm text-muted-foreground">{wallet.type}</p>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-foreground">
+                        {wallet.lanAmount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        LAN
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        €{" "}
+                        {wallet.eurAmount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-foreground">
-                      {wallet.lanAmount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      LAN
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      €{" "}
-                      {wallet.eurAmount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
