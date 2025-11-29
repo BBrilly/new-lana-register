@@ -31,6 +31,21 @@ export const useWalletBalances = (walletIds: string[]) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Read user currency from profile on mount
+  useEffect(() => {
+    const userProfileData = sessionStorage.getItem('lana_user_profile');
+    if (userProfileData) {
+      try {
+        const profile = JSON.parse(userProfileData);
+        const currency = profile.currency || "EUR";
+        setUserCurrency(currency);
+        console.log(`User currency from profile: ${currency}`);
+      } catch (e) {
+        console.warn("Failed to parse user profile, using default EUR");
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const fetchBalances = async () => {
       if (walletIds.length === 0) {
@@ -41,10 +56,10 @@ export const useWalletBalances = (walletIds: string[]) => {
         setIsLoading(true);
         setError(null);
 
-        // Fetch system parameters to get Electrum servers
+        // Fetch system parameters to get Electrum servers and FX rates
         const { data: systemParams, error: paramsError } = await supabase
           .from("system_parameters")
-          .select("electrum")
+          .select("electrum, fx")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -75,19 +90,7 @@ export const useWalletBalances = (walletIds: string[]) => {
           USD: fx.USD || 0.004,
         };
         setFxRates(fxRatesData);
-
-        // Get user currency from profile
-        const userProfileData = sessionStorage.getItem('lana_user_profile');
-        if (userProfileData) {
-          try {
-            const profile = JSON.parse(userProfileData);
-            const currency = profile.currency || "EUR";
-            setUserCurrency(currency);
-            console.log(`User currency: ${currency}`);
-          } catch (e) {
-            console.warn("Failed to parse user profile, using default EUR");
-          }
-        }
+        console.log(`FX rates from database:`, fxRatesData);
 
         console.log(`Fetching balances for ${walletIds.length} wallets using ${electrumServers.length} Electrum servers`);
 
