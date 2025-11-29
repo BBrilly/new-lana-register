@@ -1,22 +1,15 @@
+import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import WalletCard from "@/components/WalletCard";
-import AddWalletDialog from "@/components/AddWalletDialog";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUserWallets } from "@/hooks/useUserWallets";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Wallets = () => {
+  const navigate = useNavigate();
   const { wallets, isLoading, error, fxRates, userCurrency } = useUserWallets();
-
-  const handleAddWallet = (newWallet: {
-    walletNumber: string;
-    type: string;
-    description: string;
-  }) => {
-    // TODO: Implement add wallet via Supabase
-    console.log("Nova denarnica:", newWallet);
-    toast.success("Wallet will be added (functionality coming soon)");
-  };
 
   const handleDeleteWallet = (id: string) => {
     // TODO: Implement delete via Supabase
@@ -33,7 +26,10 @@ const Wallets = () => {
               Manage all your LAN wallets in one place
             </p>
           </div>
-          <AddWalletDialog onAdd={handleAddWallet} />
+          <Button size="lg" className="gap-2" onClick={() => navigate("/wallets/add")}>
+            <Plus className="h-5 w-5" />
+            Add Wallet
+          </Button>
         </div>
 
         {isLoading ? (
