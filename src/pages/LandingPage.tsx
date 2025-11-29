@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
 import NostrStatusDialog from "@/components/NostrStatusDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from "date-fns";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -14,6 +16,13 @@ const LandingPage = () => {
   const [relayStatuses, setRelayStatuses] = useState<RelayStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [stats, setStats] = useState({
+    registeredWallets: 0,
+    todayTransactions: 0,
+    yesterdayTransactions: 0,
+    totalAmount: 0,
+  });
+  const [recentBlocks, setRecentBlocks] = useState<any[]>([]);
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -46,51 +55,89 @@ const LandingPage = () => {
     loadSystemParameters();
   }, []);
 
-  // Stats data
-  const stats = {
-    registeredWallets: 493,
-    todayTransactions: 14,
-    yesterdayTransactions: 66,
-    totalAmount: 1096322.25,
-  };
+  useEffect(() => {
+    const loadBlockchainData = async () => {
+      try {
+        // Fetch registered wallets count
+        const { count: walletsCount } = await supabase
+          .from('wallets')
+          .select('*', { count: 'exact', head: true });
+
+        // Fetch transactions for today and yesterday
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const twoDaysAgo = new Date(yesterday);
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 1);
+
+        const { data: todayTx } = await supabase
+          .from('transactions')
+          .select('id')
+          .gte('created_at', today.toISOString());
+
+        const { data: yesterdayTx } = await supabase
+          .from('transactions')
+          .select('id')
+          .gte('created_at', yesterday.toISOString())
+          .lt('created_at', today.toISOString());
+
+        // Fetch total amount from all transactions
+        const { data: allTransactions } = await supabase
+          .from('transactions')
+          .select('amount');
+
+        const totalAmount = allTransactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+
+        setStats({
+          registeredWallets: walletsCount || 0,
+          todayTransactions: todayTx?.length || 0,
+          yesterdayTransactions: yesterdayTx?.length || 0,
+          totalAmount: totalAmount,
+        });
+
+        // Fetch recent blocks
+        const { data: blocks } = await supabase
+          .from('block_tx')
+          .select('*')
+          .order('block_id', { ascending: false })
+          .limit(10);
+
+        if (blocks) {
+          const formattedBlocks = blocks.map(block => {
+            const coverage = block.all_block_transactions > 0
+              ? Math.round((block.transaction_including_registered_wallets / block.all_block_transactions) * 100)
+              : 0;
+
+            return {
+              id: `#${block.block_id}`,
+              stakedTime: new Date(block.time_staked).toLocaleString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+              auditTime: formatDistanceToNow(new Date(block.time_audit), { addSuffix: true }),
+              totalTx: block.all_block_transactions,
+              registeredTx: block.transaction_including_registered_wallets,
+              coverage: coverage,
+            };
+          });
+
+          setRecentBlocks(formattedBlocks);
+        }
+      } catch (error) {
+        console.error('Error loading blockchain data:', error);
+      }
+    };
+
+    loadBlockchainData();
+  }, []);
 
   const connectedRelays = relayStatuses.filter(r => r.connected).length;
   const totalRelays = relayStatuses.length;
-
-  const recentBlocks = [
-    {
-      id: "#997090",
-      stakedTime: "14/11/2025, 17:04:00",
-      auditTime: "14 minutes ago",
-      totalTx: 2,
-      registeredTx: 0,
-      coverage: 0,
-    },
-    {
-      id: "#997089",
-      stakedTime: "14/11/2025, 17:03:12",
-      auditTime: "14 minutes ago",
-      totalTx: 2,
-      registeredTx: 0,
-      coverage: 0,
-    },
-    {
-      id: "#997088",
-      stakedTime: "14/11/2025, 17:02:24",
-      auditTime: "15 minutes ago",
-      totalTx: 3,
-      registeredTx: 1,
-      coverage: 33,
-    },
-    {
-      id: "#997087",
-      stakedTime: "14/11/2025, 17:01:36",
-      auditTime: "16 minutes ago",
-      totalTx: 5,
-      registeredTx: 2,
-      coverage: 40,
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -261,7 +308,6 @@ const LandingPage = () => {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-sm">{block.stakedTime}</span>
-                        <span className="text-xs text-muted-foreground">16 minutes ago</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{block.auditTime}</TableCell>
