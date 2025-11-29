@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Package, Sparkles, AlertTriangle, Key, Layers } from "lucide-react";
+import { ArrowLeft, Package, Sparkles, AlertTriangle, Key, Layers, QrCode } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -52,6 +53,18 @@ const WalletConsolidate = () => {
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [privateKey, setPrivateKey] = useState<string>("");
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerDivRef = useRef<HTMLDivElement>(null);
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -177,6 +190,77 @@ const WalletConsolidate = () => {
     );
   }
 
+  const startScanning = async () => {
+    setIsScanning(true);
+    
+    setTimeout(async () => {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras || cameras.length === 0) {
+          toast.error("No camera found on this device");
+          setIsScanning(false);
+          return;
+        }
+
+        let selectedCamera = cameras[0];
+        if (cameras.length > 1) {
+          const backCamera = cameras.find(camera => 
+            camera.label.toLowerCase().includes('back') || 
+            camera.label.toLowerCase().includes('rear')
+          );
+          if (backCamera) {
+            selectedCamera = backCamera;
+          }
+        }
+
+        const scanner = new Html5Qrcode("qr-reader-consolidate");
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          selectedCamera.id,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          },
+          (decodedText) => {
+            setPrivateKey(decodedText);
+            stopScanning();
+            toast.success("QR code scanned successfully");
+          },
+          (errorMessage) => {
+            // Ignore during operation
+          }
+        );
+      } catch (error: any) {
+        console.error("Error starting QR scanner:", error);
+        setIsScanning(false);
+        
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          toast.error("Camera permission denied. Please allow camera access.");
+        } else if (error.name === "NotFoundError") {
+          toast.error("No camera found on this device");
+        } else if (error.name === "NotReadableError") {
+          toast.error("Camera is already in use by another application");
+        } else {
+          toast.error(`Error starting camera: ${error.message || "Unknown error"}`);
+        }
+      }
+    }, 100);
+  };
+
+  const stopScanning = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (error) {
+        console.error("Error stopping scanner:", error);
+      }
+    }
+    setIsScanning(false);
+  };
+
   const handleConsolidateBatch = (batchId: number) => {
     if (!privateKey.trim()) {
       toast.error("Please enter your private key first");
@@ -214,7 +298,7 @@ const WalletConsolidate = () => {
             <div className="rounded-lg bg-primary/10 p-3">
               <Key className="h-6 w-6 text-primary" />
             </div>
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-3">
               <Label htmlFor="privateKey" className="text-base font-semibold">
                 Wallet Private Key
               </Label>
@@ -227,8 +311,37 @@ const WalletConsolidate = () => {
                 placeholder="Enter your private key (WIF format)"
                 value={privateKey}
                 onChange={(e) => setPrivateKey(e.target.value)}
+                disabled={isScanning}
                 className="font-mono"
               />
+              
+              {!isScanning ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={startScanning}
+                  className="w-full"
+                >
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Scan QR Code
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div
+                    id="qr-reader-consolidate"
+                    ref={scannerDivRef}
+                    className="rounded-lg overflow-hidden border-2 border-primary"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={stopScanning}
+                    className="w-full"
+                  >
+                    Stop Scanning
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -279,7 +392,7 @@ const WalletConsolidate = () => {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Dust Threshold:</span>
               <span className="font-mono">
-                &lt; {analysis.dust_threshold_lana} LAN ({analysis.dust_threshold} satoshis)
+                &lt; {analysis.dust_threshold_lana} LAN ({analysis.dust_threshold} lanoshis)
               </span>
             </div>
             <div className="flex justify-between">
@@ -321,7 +434,7 @@ const WalletConsolidate = () => {
                   <th className="text-left py-2 px-2">#</th>
                   <th className="text-left py-2 px-2">Transaction</th>
                   <th className="text-right py-2 px-2">Value (LAN)</th>
-                  <th className="text-right py-2 px-2">Value (satoshis)</th>
+                  <th className="text-right py-2 px-2">Value (lanoshis)</th>
                   <th className="text-right py-2 px-2">Height</th>
                 </tr>
               </thead>
@@ -387,7 +500,7 @@ const WalletConsolidate = () => {
                           {batch.totalValueLana} LAN
                         </span>
                         <span className="text-muted-foreground">
-                          ({batch.totalValue.toLocaleString()} satoshis)
+                          ({batch.totalValue.toLocaleString()} lanoshis)
                         </span>
                       </div>
                     </div>
@@ -418,7 +531,7 @@ const WalletConsolidate = () => {
               </p>
               <p className="text-muted-foreground">
                 Consider consolidating these small UTXOs to reduce transaction fees in the future.
-                Each UTXO adds approximately 180 bytes to a transaction, increasing the fee by ~18,000 satoshis.
+                Each UTXO adds approximately 180 bytes to a transaction, increasing the fee by ~18,000 lanoshis.
               </p>
             </div>
           </Card>
