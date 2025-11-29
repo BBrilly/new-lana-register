@@ -2,10 +2,11 @@ import { Wallet } from "@/types/wallet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink, Package } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface WalletCardProps {
   wallet: Wallet;
@@ -16,6 +17,7 @@ interface WalletCardProps {
 
 const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps) => {
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
 
   const getCurrencySymbol = (currency: string) => {
     switch (currency) {
@@ -116,6 +118,15 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/wallets/${wallet.id}/consolidate`)}
+              className="gap-2"
+            >
+              <Package className="h-4 w-4" />
+              Consolidate
+            </Button>
             <Button
               variant="outline"
               size="sm"
