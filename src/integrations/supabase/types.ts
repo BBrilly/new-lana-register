@@ -80,7 +80,6 @@ export type Database = {
           profile_pic_link: string | null
           status: string | null
           updated_at: string
-          user_id: string | null
           wallet_id: string | null
         }
         Insert: {
@@ -91,7 +90,6 @@ export type Database = {
           profile_pic_link?: string | null
           status?: string | null
           updated_at?: string
-          user_id?: string | null
           wallet_id?: string | null
         }
         Update: {
@@ -102,7 +100,6 @@ export type Database = {
           profile_pic_link?: string | null
           status?: string | null
           updated_at?: string
-          user_id?: string | null
           wallet_id?: string | null
         }
         Relationships: []

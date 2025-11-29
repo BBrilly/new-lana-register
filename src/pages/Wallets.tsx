@@ -1,31 +1,25 @@
-import { useState } from "react";
 import Layout from "@/components/Layout";
 import WalletCard from "@/components/WalletCard";
 import AddWalletDialog from "@/components/AddWalletDialog";
-import { MOCK_WALLETS } from "@/data/mockData";
-import { Wallet } from "@/types/wallet";
 import { toast } from "sonner";
+import { useUserWallets } from "@/hooks/useUserWallets";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Wallets = () => {
-  const [wallets, setWallets] = useState<Wallet[]>(MOCK_WALLETS);
+  const { wallets, isLoading, error } = useUserWallets();
 
   const handleAddWallet = (newWallet: {
     walletNumber: string;
-    type: "Hardware" | "Software" | "Exchange";
+    type: string;
     description: string;
   }) => {
-    const wallet: Wallet = {
-      id: Date.now().toString(),
-      ...newWallet,
-      lanAmount: 0,
-      eurAmount: 0,
-      events: [],
-    };
-    setWallets([...wallets, wallet]);
+    // TODO: Implement add wallet via Supabase
+    console.log("Nova denarnica:", newWallet);
+    toast.success("Wallet will be added (functionality coming soon)");
   };
 
   const handleDeleteWallet = (id: string) => {
-    setWallets(wallets.filter((wallet) => wallet.id !== id));
+    // TODO: Implement delete via Supabase
     toast.success("Wallet successfully deleted");
   };
 
@@ -42,13 +36,19 @@ const Wallets = () => {
           <AddWalletDialog onAdd={handleAddWallet} />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {wallets.map((wallet) => (
-            <WalletCard key={wallet.id} wallet={wallet} onDelete={handleDeleteWallet} />
-          ))}
-        </div>
-
-        {wallets.length === 0 && (
+        {isLoading ? (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-96 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        ) : error ? (
+          <div className="flex min-h-[400px] items-center justify-center rounded-xl border-2 border-dashed border-border">
+            <div className="text-center">
+              <p className="text-lg font-medium text-foreground">Error loading wallets</p>
+              <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+            </div>
+          </div>
+        ) : wallets.length === 0 ? (
           <div className="flex min-h-[400px] items-center justify-center rounded-xl border-2 border-dashed border-border">
             <div className="text-center">
               <p className="text-lg font-medium text-foreground">No wallets added yet</p>
@@ -56,6 +56,12 @@ const Wallets = () => {
                 Add your first wallet to start tracking
               </p>
             </div>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {wallets.map((wallet) => (
+              <WalletCard key={wallet.id} wallet={wallet} onDelete={handleDeleteWallet} />
+            ))}
           </div>
         )}
       </div>
