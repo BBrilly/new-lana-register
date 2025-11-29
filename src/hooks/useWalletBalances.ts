@@ -18,8 +18,16 @@ interface BalanceResponse {
   error?: string;
 }
 
+interface FxRates {
+  EUR: number;
+  GBP: number;
+  USD: number;
+}
+
 export const useWalletBalances = (walletIds: string[]) => {
   const [balances, setBalances] = useState<Map<string, number>>(new Map());
+  const [fxRates, setFxRates] = useState<FxRates | null>(null);
+  const [userCurrency, setUserCurrency] = useState<string>("EUR");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +65,28 @@ export const useWalletBalances = (walletIds: string[]) => {
 
         if (electrumServers.length === 0) {
           throw new Error("No Electrum servers available");
+        }
+
+        // Parse FX rates from system parameters
+        const fx = (systemParams as any).fx || {};
+        const fxRatesData: FxRates = {
+          EUR: fx.EUR || 0.004,
+          GBP: fx.GBP || 0.004,
+          USD: fx.USD || 0.004,
+        };
+        setFxRates(fxRatesData);
+
+        // Get user currency from profile
+        const userProfileData = sessionStorage.getItem('lana_user_profile');
+        if (userProfileData) {
+          try {
+            const profile = JSON.parse(userProfileData);
+            const currency = profile.currency || "EUR";
+            setUserCurrency(currency);
+            console.log(`User currency: ${currency}`);
+          } catch (e) {
+            console.warn("Failed to parse user profile, using default EUR");
+          }
         }
 
         console.log(`Fetching balances for ${walletIds.length} wallets using ${electrumServers.length} Electrum servers`);
@@ -99,5 +129,5 @@ export const useWalletBalances = (walletIds: string[]) => {
     fetchBalances();
   }, [walletIds.join(",")]); // Re-fetch when wallet IDs change
 
-  return { balances, isLoading, error };
+  return { balances, fxRates, userCurrency, isLoading, error };
 };

@@ -1,16 +1,15 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Wallet } from "@/types/wallet";
-import { getAuthSession } from "@/utils/wifAuth";
+import { getAuthSession } from "@/utils/wifAuth"
 import { useWalletBalances } from "./useWalletBalances";
-import { EUR_CONVERSION_RATE } from "@/data/mockData";
 
 export const useUserWallets = () => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [walletIds, setWalletIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { balances, isLoading: isLoadingBalances } = useWalletBalances(walletIds);
+  const { balances, fxRates, userCurrency, isLoading: isLoadingBalances } = useWalletBalances(walletIds);
 
   useEffect(() => {
     const fetchWallets = async () => {
@@ -104,18 +103,21 @@ export const useUserWallets = () => {
 
   // Update wallet balances when balances are loaded
   useEffect(() => {
-    if (balances.size > 0 && wallets.length > 0) {
+    if (balances.size > 0 && wallets.length > 0 && fxRates) {
+      // Get the exchange rate for user's currency
+      const exchangeRate = fxRates[userCurrency as keyof typeof fxRates] || fxRates.EUR;
+      
       const updatedWallets = wallets.map((wallet) => {
         const balance = balances.get(wallet.walletNumber) || 0;
         return {
           ...wallet,
           lanAmount: balance,
-          eurAmount: balance * EUR_CONVERSION_RATE,
+          eurAmount: balance * exchangeRate,
         };
       });
       setWallets(updatedWallets);
     }
-  }, [balances]);
+  }, [balances, fxRates, userCurrency]);
 
   return { wallets, isLoading: isLoading || isLoadingBalances, error };
 };
