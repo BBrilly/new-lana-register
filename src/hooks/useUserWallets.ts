@@ -119,5 +119,5 @@ export const useUserWallets = () => {
     }
   }, [balances, fxRates, userCurrency]);
 
-  return { wallets, isLoading: isLoading || isLoadingBalances, error };
+  return { wallets, isLoading: isLoading || isLoadingBalances, error, fxRates, userCurrency };
 };

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import StatCard from "@/components/StatCard";
 import AddWalletDialog from "@/components/AddWalletDialog";
-import { EUR_CONVERSION_RATE } from "@/data/mockData";
-import { Wallet as WalletIcon, TrendingUp, Euro, Activity } from "lucide-react";
+import { Wallet as WalletIcon, TrendingUp, DollarSign, Activity } from "lucide-react";
 import { isAuthenticated, getAuthSession, getUserProfile } from "@/utils/wifAuth";
 import { useUserWallets } from "@/hooks/useUserWallets";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const Dashboard = () => {
   const navigate = useNavigate();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
-  const { wallets, isLoading, error } = useUserWallets();
+  const { wallets, isLoading, error, fxRates, userCurrency } = useUserWallets();
 
   // Check authentication on mount
   useEffect(() => {
@@ -32,9 +31,22 @@ const Dashboard = () => {
   const userProfile = getUserProfile();
 
   const totalLan = wallets.reduce((sum, wallet) => sum + wallet.lanAmount, 0);
-  const totalEur = wallets.reduce((sum, wallet) => sum + wallet.eurAmount, 0);
+  const totalFiat = wallets.reduce((sum, wallet) => sum + wallet.eurAmount, 0);
   const totalWallets = wallets.length;
   const unreadEvents = wallets.reduce((sum, wallet) => sum + wallet.events.length, 0);
+
+  // Get currency symbol
+  const getCurrencySymbol = (currency: string) => {
+    switch (currency) {
+      case "EUR": return "€";
+      case "USD": return "$";
+      case "GBP": return "£";
+      default: return currency;
+    }
+  };
+
+  const currencySymbol = getCurrencySymbol(userCurrency);
+  const exchangeRate = fxRates?.[userCurrency as keyof typeof fxRates] || 0;
 
   const handleAddWallet = (newWallet: {
     walletNumber: string;
@@ -90,17 +102,15 @@ const Dashboard = () => {
             })}
             subtitle="All wallets"
             icon={<WalletIcon className="h-6 w-6" />}
-            trend={{ value: "12.5%", isPositive: true }}
           />
           <StatCard
-            title="Total EUR"
-            value={`€ ${totalEur.toLocaleString("en-US", {
+            title={`Total ${userCurrency}`}
+            value={`${currencySymbol} ${totalFiat.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}`}
-            subtitle={`Exchange rate: 1 LAN = ${EUR_CONVERSION_RATE} EUR`}
-            icon={<Euro className="h-6 w-6" />}
-            trend={{ value: "8.2%", isPositive: true }}
+            subtitle={`Exchange rate: 1 LAN = ${exchangeRate.toFixed(6)} ${userCurrency}`}
+            icon={<DollarSign className="h-6 w-6" />}
           />
           <StatCard
             title="Active Wallets"
@@ -172,7 +182,7 @@ const Dashboard = () => {
                         LAN
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        €{" "}
+                        {currencySymbol}{" "}
                         {wallet.eurAmount.toLocaleString("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
