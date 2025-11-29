@@ -160,16 +160,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          visible_in_form: boolean
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          visible_in_form?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          visible_in_form?: boolean
         }
         Relationships: []
       }
