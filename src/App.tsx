@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Wallets from "./pages/Wallets";
+import AddWallet from "./pages/AddWallet";
 import WalletConsolidate from "./pages/WalletConsolidate";
 import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/wallets" element={<Wallets />} />
+          <Route path="/wallets/add" element={<AddWallet />} />
           <Route path="/wallets/:walletId/consolidate" element={<WalletConsolidate />} />
           <Route path="/admin" element={<AdminPanel />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
