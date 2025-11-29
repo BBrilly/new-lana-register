@@ -10,6 +10,7 @@ import { ArrowLeft, Package, Sparkles, AlertTriangle, Key, Layers, QrCode } from
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { convertWifToIds } from "@/utils/wifAuth";
 
 interface UTXO {
   tx_hash: string;
@@ -57,8 +58,39 @@ const WalletConsolidate = () => {
   const [privateKey, setPrivateKey] = useState<string>("");
   const [batches, setBatches] = useState<Batch[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [isKeyValid, setIsKeyValid] = useState<boolean | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerDivRef = useRef<HTMLDivElement>(null);
+
+  // Validate private key
+  useEffect(() => {
+    const validatePrivateKey = async () => {
+      if (!privateKey.trim()) {
+        setIsKeyValid(null);
+        return;
+      }
+
+      setIsValidatingKey(true);
+      try {
+        const derived = await convertWifToIds(privateKey);
+        const isValid = derived.walletId === walletAddress;
+        setIsKeyValid(isValid);
+        
+        if (!isValid) {
+          toast.error("Private key does not match this wallet address");
+        }
+      } catch (error) {
+        setIsKeyValid(false);
+        toast.error("Invalid private key format");
+      } finally {
+        setIsValidatingKey(false);
+      }
+    };
+
+    const timeoutId = setTimeout(validatePrivateKey, 500);
+    return () => clearTimeout(timeoutId);
+  }, [privateKey, walletAddress]);
 
   // Cleanup scanner on unmount
   useEffect(() => {
@@ -380,15 +412,38 @@ const WalletConsolidate = () => {
               <p className="text-sm text-muted-foreground">
                 Enter your private key to authorize consolidation transactions. Your key is never sent to our servers.
               </p>
-              <Input
-                id="privateKey"
-                type="password"
-                placeholder="Enter your private key (WIF format)"
-                value={privateKey}
-                onChange={(e) => setPrivateKey(e.target.value)}
-                disabled={isScanning}
-                className="font-mono"
-              />
+              <div className="relative">
+                <Input
+                  id="privateKey"
+                  type="password"
+                  placeholder="Enter your private key (WIF format)"
+                  value={privateKey}
+                  onChange={(e) => setPrivateKey(e.target.value)}
+                  disabled={isScanning || isValidatingKey}
+                  className={`font-mono pr-10 ${
+                    isKeyValid === true 
+                      ? 'border-green-500 focus-visible:ring-green-500' 
+                      : isKeyValid === false 
+                      ? 'border-destructive focus-visible:ring-destructive' 
+                      : ''
+                  }`}
+                />
+                {isValidatingKey && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                )}
+                {!isValidatingKey && isKeyValid === true && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">
+                    ✓
+                  </div>
+                )}
+                {!isValidatingKey && isKeyValid === false && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-destructive">
+                    ✗
+                  </div>
+                )}
+              </div>
               
               {!isScanning ? (
                 <Button
@@ -581,7 +636,7 @@ const WalletConsolidate = () => {
                     </div>
                     <Button
                       onClick={() => handleConsolidateBatch(batch.id)}
-                      disabled={!privateKey.trim() || batch.isProcessing || batch.isCompleted}
+                      disabled={!privateKey.trim() || isKeyValid !== true || batch.isProcessing || batch.isCompleted}
                       className="ml-4"
                     >
                       {batch.isProcessing ? (
