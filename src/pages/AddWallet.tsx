@@ -26,9 +26,11 @@ const AddWallet = () => {
   const [walletTypes, setWalletTypes] = useState<{ id: string; name: string }[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [isValid, setIsValid] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerDivRef = useRef<HTMLDivElement>(null);
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const fetchWalletTypes = async () => {
@@ -62,11 +64,36 @@ const AddWallet = () => {
     };
   }, []);
 
-  const validateWalletBalance = async (walletId: string) => {
+  const validateWallet = async (walletId: string) => {
+    if (!walletId || walletId.length < 10) {
+      setValidationError(null);
+      setIsValid(false);
+      return;
+    }
+
     setIsValidating(true);
-    setBalanceError(null);
+    setValidationError(null);
+    setIsValid(false);
 
     try {
+      // First check if wallet already exists in database
+      const { data: existingWallet, error: walletCheckError } = await supabase
+        .from("wallets")
+        .select("id, wallet_id")
+        .eq("wallet_id", walletId)
+        .maybeSingle();
+
+      if (walletCheckError && walletCheckError.code !== "PGRST116") {
+        throw walletCheckError;
+      }
+
+      if (existingWallet) {
+        setValidationError("This wallet is already registered in the system.");
+        setIsValid(false);
+        setIsValidating(false);
+        return;
+      }
+
       // Fetch system parameters for electrum servers
       const { data: systemParams, error: paramsError } = await supabase
         .from("system_parameters")
@@ -108,33 +135,55 @@ const AddWallet = () => {
       const walletBalance = data.wallets[0]?.balance || 0;
       
       if (walletBalance > 0) {
-        setBalanceError(
+        setValidationError(
           `This wallet has a balance of ${walletBalance} LANA. Only wallets with 0 balance can be registered.`
         );
-        return false;
+        setIsValid(false);
+      } else {
+        setValidationError(null);
+        setIsValid(true);
       }
-
-      return true;
     } catch (err) {
-      console.error("Error validating wallet balance:", err);
-      toast.error("Failed to validate wallet balance");
-      return false;
+      console.error("Error validating wallet:", err);
+      setValidationError("Failed to validate wallet. Please try again.");
+      setIsValid(false);
     } finally {
       setIsValidating(false);
     }
   };
 
+  // Debounced validation when wallet number changes
+  useEffect(() => {
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    if (walletNumber && walletNumber.length >= 10) {
+      validationTimeoutRef.current = setTimeout(() => {
+        validateWallet(walletNumber);
+      }, 800);
+    } else {
+      setValidationError(null);
+      setIsValid(false);
+    }
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, [walletNumber]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!walletNumber || !description) {
-      toast.error("Please fill in all fields");
+    if (!isValid) {
+      toast.error("Please ensure the wallet passes all validations");
       return;
     }
 
-    // Validate wallet balance before proceeding
-    const isValid = await validateWalletBalance(walletNumber);
-    if (!isValid) {
+    if (!walletNumber || !description) {
+      toast.error("Please fill in all fields");
       return;
     }
 
@@ -241,12 +290,9 @@ const AddWallet = () => {
               id="walletNumber"
               placeholder="LZgUUQALhZbCoQrUXEDDwJS1Pb99E1bJ27..."
               value={walletNumber}
-              onChange={(e) => {
-                setWalletNumber(e.target.value);
-                setBalanceError(null);
-              }}
+              onChange={(e) => setWalletNumber(e.target.value)}
               className="font-mono"
-              disabled={isScanning || isValidating}
+              disabled={isScanning}
             />
             {!isScanning ? (
               <Button
@@ -254,7 +300,6 @@ const AddWallet = () => {
                 variant="outline"
                 onClick={startScanning}
                 className="w-full gap-2"
-                disabled={isValidating}
               >
                 <QrCode className="h-4 w-4" />
                 Scan Wallet QR Code
@@ -278,15 +323,32 @@ const AddWallet = () => {
             )}
           </div>
 
-          {balanceError && (
+          {isValidating && walletNumber && (
+            <Alert>
+              <AlertDescription className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Validating wallet...
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {validationError && (
             <Alert variant="destructive">
-              <AlertDescription>{balanceError}</AlertDescription>
+              <AlertDescription>{validationError}</AlertDescription>
+            </Alert>
+          )}
+
+          {isValid && !isValidating && (
+            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+              <AlertDescription className="text-green-700 dark:text-green-400">
+                ✓ Wallet is valid and can be registered
+              </AlertDescription>
             </Alert>
           )}
 
           <div className="space-y-2">
             <Label htmlFor="type">Wallet Type</Label>
-            <Select value={type} onValueChange={(value: any) => setType(value)} disabled={isValidating}>
+            <Select value={type} onValueChange={(value: any) => setType(value)}>
               <SelectTrigger id="type">
                 <SelectValue />
               </SelectTrigger>
@@ -308,7 +370,6 @@ const AddWallet = () => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              disabled={isValidating}
             />
           </div>
 
@@ -317,19 +378,16 @@ const AddWallet = () => {
               type="button" 
               variant="outline" 
               onClick={() => navigate("/wallets")} 
-              disabled={isScanning || isValidating}
+              disabled={isScanning}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isScanning || isValidating}>
-              {isValidating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                "Add Wallet"
-              )}
+            <Button 
+              type="submit" 
+              disabled={isScanning || !isValid || isValidating}
+              className={isValid && !isValidating ? "bg-green-600 hover:bg-green-700" : ""}
+            >
+              Add Wallet
             </Button>
           </div>
         </form>
