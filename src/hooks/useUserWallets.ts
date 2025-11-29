@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Wallet } from "@/types/wallet";
+import { getAuthSession } from "@/utils/wifAuth";
 
 export const useUserWallets = () => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -13,8 +14,8 @@ export const useUserWallets = () => {
         setIsLoading(true);
         setError(null);
 
-        // Get nostrHexId from sessionStorage
-        const authSession = sessionStorage.getItem("authSession");
+        // Get nostrHexId from session
+        const authSession = getAuthSession();
         if (!authSession) {
           // Not logged in - return empty list without error
           setWallets([]);
@@ -22,8 +23,7 @@ export const useUserWallets = () => {
           return;
         }
 
-        const session = JSON.parse(authSession);
-        const nostrHexId = session.nostrHexId;
+        const nostrHexId = authSession.nostrHexId;
 
         if (!nostrHexId) {
           throw new Error("No nostr hex ID found in session");
