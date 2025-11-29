@@ -6,7 +6,7 @@ import { useUserWallets } from "@/hooks/useUserWallets";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Wallets = () => {
-  const { wallets, isLoading, error } = useUserWallets();
+  const { wallets, isLoading, error, fxRates, userCurrency } = useUserWallets();
 
   const handleAddWallet = (newWallet: {
     walletNumber: string;
@@ -60,7 +60,13 @@ const Wallets = () => {
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
             {wallets.map((wallet) => (
-              <WalletCard key={wallet.id} wallet={wallet} onDelete={handleDeleteWallet} />
+              <WalletCard 
+                key={wallet.id} 
+                wallet={wallet} 
+                onDelete={handleDeleteWallet}
+                userCurrency={userCurrency}
+                fxRates={fxRates}
+              />
             ))}
           </div>
         )}
