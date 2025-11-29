@@ -1,35 +1,302 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Settings } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Shield, RefreshCw, Wallet, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import StatCard from "@/components/StatCard";
+
+interface UnregisteredEvent {
+  id: string;
+  detected_at: string | null;
+  wallet_id: string;
+  unregistered_amount: number;
+  notes: string | null;
+  return_transaction_id: string | null;
+}
+
+interface WalletWithType {
+  id: string;
+  wallet_id: string | null;
+  wallet_type: string;
+}
+
+interface WalletBalance {
+  wallet_id: string;
+  address: string;
+  confirmed: number;
+  unconfirmed: number;
+}
+
+interface AnalyticsData {
+  totalBalance: number;
+  byType: {
+    type: string;
+    count: number;
+    balance: number;
+    percentage: number;
+  }[];
+}
 
 const AdminPanel = () => {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const { data: unregisteredEvents, isLoading: eventsLoading } = useQuery({
+    queryKey: ["unregistered-events", refreshKey],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("unregistered_lana_events")
+        .select("*")
+        .order("detected_at", { ascending: false });
+
+      if (error) throw error;
+      return data as UnregisteredEvent[];
+    },
+  });
+
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["analytics-dashboard", refreshKey],
+    queryFn: async () => {
+      // Fetch all wallets with their types
+      const { data: wallets, error: walletsError } = await supabase
+        .from("wallets")
+        .select("id, wallet_id, wallet_type");
+
+      if (walletsError) throw walletsError;
+
+      // Fetch system parameters for electrum servers
+      const { data: sysParams, error: paramsError } = await supabase
+        .from("system_parameters")
+        .select("electrum, fx")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (paramsError) throw paramsError;
+
+      const electrumServers = sysParams.electrum as any[];
+      const fxRates = sysParams.fx as any;
+
+      // Get wallet addresses
+      const walletAddresses = wallets
+        .filter((w: WalletWithType) => w.wallet_id)
+        .map((w: WalletWithType) => w.wallet_id as string);
+
+      // Fetch balances from edge function
+      const { data: balancesData, error: balanceError } = await supabase.functions.invoke(
+        "fetch-wallet-balance",
+        {
+          body: {
+            wallet_addresses: walletAddresses,
+            electrum_servers: electrumServers,
+          },
+        }
+      );
+
+      if (balanceError) throw balanceError;
+
+      // Map balances to wallet IDs
+      const balanceMap = new Map<string, number>();
+      balancesData.wallets.forEach((wb: WalletBalance) => {
+        balanceMap.set(wb.address, wb.confirmed / 100000000);
+      });
+
+      // Calculate analytics
+      let totalBalance = 0;
+      const typeStats = new Map<string, { count: number; balance: number }>();
+
+      wallets.forEach((wallet: WalletWithType) => {
+        const balance = wallet.wallet_id ? balanceMap.get(wallet.wallet_id) || 0 : 0;
+        totalBalance += balance;
+
+        const existing = typeStats.get(wallet.wallet_type) || { count: 0, balance: 0 };
+        typeStats.set(wallet.wallet_type, {
+          count: existing.count + 1,
+          balance: existing.balance + balance,
+        });
+      });
+
+      const byType = Array.from(typeStats.entries())
+        .map(([type, stats]) => ({
+          type,
+          count: stats.count,
+          balance: stats.balance,
+          percentage: totalBalance > 0 ? (stats.balance / totalBalance) * 100 : 0,
+        }))
+        .sort((a, b) => b.balance - a.balance);
+
+      return {
+        totalBalance,
+        byType,
+      } as AnalyticsData;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Shield className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-sm text-muted-foreground">System administration and management</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Shield className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
+              <p className="text-sm text-muted-foreground">System administration and management</p>
+            </div>
           </div>
+          <Button
+            onClick={() => setRefreshKey((prev) => prev + 1)}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Admin Dashboard
-            </CardTitle>
-            <CardDescription>
-              Manage your system settings and configurations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Admin functionality will be added here as needed.
-            </p>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="events" className="w-full">
+          <TabsList>
+            <TabsTrigger value="events">Unregistered Events</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics Dashboard</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="events" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Unregistered Lana Events</CardTitle>
+                <CardDescription>
+                  All detected unregistered Lana transactions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {eventsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : !unregisteredEvents || unregisteredEvents.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No unregistered events found
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Detected At</TableHead>
+                          <TableHead>Wallet ID</TableHead>
+                          <TableHead className="text-right">Amount (Lanoshi)</TableHead>
+                          <TableHead>Notes</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unregisteredEvents.map((event) => (
+                          <TableRow key={event.id}>
+                            <TableCell>
+                              {event.detected_at
+                                ? format(new Date(event.detected_at), "PPp")
+                                : "N/A"}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {event.wallet_id.slice(0, 8)}...
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {event.unregistered_amount.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="max-w-md truncate">
+                              {event.notes || "—"}
+                            </TableCell>
+                            <TableCell>
+                              {event.return_transaction_id ? (
+                                <span className="text-success">Returned</span>
+                              ) : (
+                                <span className="text-muted-foreground">Pending</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            {analyticsLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            ) : analyticsData ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <StatCard
+                    title="Total Wallet Balance"
+                    value={`${analyticsData.totalBalance.toFixed(2)} LANA`}
+                    subtitle={`Across ${analyticsData.byType.reduce((sum, t) => sum + t.count, 0)} wallets`}
+                    icon={<Wallet className="h-6 w-6" />}
+                  />
+                  <StatCard
+                    title="Wallet Types"
+                    value={`${analyticsData.byType.length}`}
+                    subtitle="Different types registered"
+                    icon={<TrendingUp className="h-6 w-6" />}
+                  />
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Balance by Wallet Type</CardTitle>
+                    <CardDescription>
+                      Breakdown of balances across different wallet types
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Wallet Type</TableHead>
+                            <TableHead className="text-right">Number of Wallets</TableHead>
+                            <TableHead className="text-right">Total Balance (LANA)</TableHead>
+                            <TableHead className="text-right">Percentage</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {analyticsData.byType.map((typeData) => (
+                            <TableRow key={typeData.type}>
+                              <TableCell className="font-medium">{typeData.type}</TableCell>
+                              <TableCell className="text-right">{typeData.count}</TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {typeData.balance.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {typeData.percentage.toFixed(1)}%
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">
+                Failed to load analytics data
+              </p>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
