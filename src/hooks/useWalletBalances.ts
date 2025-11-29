@@ -50,8 +50,10 @@ export const useWalletBalances = (walletIds: string[]) => {
         }
 
         // Parse electrum servers from system parameters
-        const electrumData = systemParams.electrum as any;
-        const electrumServers = electrumData.servers || [];
+        const electrumServers = (systemParams.electrum as any[]).map(server => ({
+          host: server.host,
+          port: parseInt(server.port, 10)
+        }));
 
         if (electrumServers.length === 0) {
           throw new Error("No Electrum servers available");
