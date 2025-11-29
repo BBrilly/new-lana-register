@@ -28,9 +28,8 @@ interface WalletWithType {
 
 interface WalletBalance {
   wallet_id: string;
-  address: string;
-  confirmed: number;
-  unconfirmed: number;
+  balance: number;
+  status: string;
 }
 
 interface AnalyticsData {
@@ -80,30 +79,51 @@ const AdminPanel = () => {
       if (paramsError) throw paramsError;
 
       const electrumServers = sysParams.electrum as any[];
-      const fxRates = sysParams.fx as any;
 
       // Get wallet addresses
       const walletAddresses = wallets
         .filter((w: WalletWithType) => w.wallet_id)
         .map((w: WalletWithType) => w.wallet_id as string);
 
-      // Fetch balances from edge function
-      const { data: balancesData, error: balanceError } = await supabase.functions.invoke(
-        "fetch-wallet-balance",
-        {
-          body: {
-            wallet_addresses: walletAddresses,
-            electrum_servers: electrumServers,
-          },
+      // Split addresses into batches of 50
+      const BATCH_SIZE = 50;
+      const batches: string[][] = [];
+      for (let i = 0; i < walletAddresses.length; i += BATCH_SIZE) {
+        batches.push(walletAddresses.slice(i, i + BATCH_SIZE));
+      }
+
+      console.log(`Fetching balances for ${walletAddresses.length} wallets in ${batches.length} batches`);
+
+      // Fetch balances for each batch
+      const allBalances: WalletBalance[] = [];
+      for (const batch of batches) {
+        const { data: balancesData, error: balanceError } = await supabase.functions.invoke(
+          "fetch-wallet-balance",
+          {
+            body: {
+              wallet_addresses: batch,
+              electrum_servers: electrumServers,
+            },
+          }
+        );
+
+        if (balanceError) {
+          console.error("Balance fetch error:", balanceError);
+          throw balanceError;
         }
-      );
 
-      if (balanceError) throw balanceError;
+        if (balancesData?.wallets) {
+          allBalances.push(...balancesData.wallets);
+        }
+      }
 
-      // Map balances to wallet IDs
+      console.log(`Fetched ${allBalances.length} wallet balances`);
+
+      // Map balances to wallet addresses
       const balanceMap = new Map<string, number>();
-      balancesData.wallets.forEach((wb: WalletBalance) => {
-        balanceMap.set(wb.address, wb.confirmed / 100000000);
+      allBalances.forEach((wb: WalletBalance) => {
+        // Balance is already in LANA from the edge function
+        balanceMap.set(wb.wallet_id, wb.balance || 0);
       });
 
       // Calculate analytics
@@ -129,6 +149,8 @@ const AdminPanel = () => {
           percentage: totalBalance > 0 ? (stats.balance / totalBalance) * 100 : 0,
         }))
         .sort((a, b) => b.balance - a.balance);
+
+      console.log("Analytics calculated:", { totalBalance, typeCount: byType.length });
 
       return {
         totalBalance,
