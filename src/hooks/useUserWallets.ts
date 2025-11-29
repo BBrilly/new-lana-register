@@ -16,7 +16,10 @@ export const useUserWallets = () => {
         // Get nostrHexId from sessionStorage
         const authSession = sessionStorage.getItem("authSession");
         if (!authSession) {
-          throw new Error("No authentication session found");
+          // Not logged in - return empty list without error
+          setWallets([]);
+          setIsLoading(false);
+          return;
         }
 
         const session = JSON.parse(authSession);

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import StatCard from "@/components/StatCard";
@@ -11,14 +11,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
   const { wallets, isLoading, error } = useUserWallets();
 
   // Check authentication on mount
   useEffect(() => {
     if (!isAuthenticated()) {
       navigate("/login");
+    } else {
+      setIsAuthChecked(true);
     }
   }, [navigate]);
+
+  // Don't render until auth is checked
+  if (!isAuthChecked) {
+    return null;
+  }
 
   const authSession = getAuthSession();
   const userProfile = getUserProfile();
