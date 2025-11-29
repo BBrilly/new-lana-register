@@ -2,7 +2,7 @@ import { Wallet } from "@/types/wallet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -115,14 +115,25 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
               </div>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(wallet.id)}
-            className="text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`https://chainz.cryptoid.info/lana/address.dws?${wallet.walletNumber}.htm`, '_blank')}
+              className="gap-2"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Transactions
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(wallet.id)}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-4">
