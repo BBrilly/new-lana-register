@@ -46,6 +46,7 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
       const { data, error } = await supabase
         .from("wallet_types")
         .select("id, name")
+        .eq("visible_in_form", true)
         .order("name");
 
       if (error) {
