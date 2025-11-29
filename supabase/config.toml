@@ -1,5 +1,8 @@
 project_id = "laluxmwarlejdwyboudz"
 
+[functions.blockchain-monitor]
+verify_jwt = false
+
 [functions.sync-system-parameters]
 verify_jwt = false
 
