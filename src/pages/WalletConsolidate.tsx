@@ -43,6 +43,9 @@ interface Batch {
   totalValue: number;
   totalValueLana: string;
   dustCount: number;
+  isProcessing?: boolean;
+  isCompleted?: boolean;
+  txid?: string;
 }
 
 const WalletConsolidate = () => {
@@ -261,12 +264,84 @@ const WalletConsolidate = () => {
     setIsScanning(false);
   };
 
-  const handleConsolidateBatch = (batchId: number) => {
+  const handleConsolidateBatch = async (batchId: number) => {
     if (!privateKey.trim()) {
       toast.error("Please enter your private key first");
       return;
     }
-    toast.info(`Batch ${batchId} consolidation will be implemented next`);
+
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) {
+      toast.error("Batch not found");
+      return;
+    }
+
+    // Mark batch as processing
+    setBatches(prev => prev.map(b => 
+      b.id === batchId ? { ...b, isProcessing: true } : b
+    ));
+
+    try {
+      toast.info(`Starting consolidation of Batch #${batchId} (${batch.utxos.length} UTXOs)...`);
+
+      // Fetch electrum servers
+      const { data: systemParams, error: paramsError } = await supabase
+        .from("system_parameters")
+        .select("electrum")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (paramsError) {
+        throw new Error("Failed to fetch system parameters");
+      }
+
+      // Call consolidate-wallet edge function
+      const { data, error } = await supabase.functions.invoke(
+        "consolidate-wallet",
+        {
+          body: {
+            sender_address: walletAddress,
+            selected_utxos: batch.utxos,
+            private_key: privateKey,
+            electrum_servers: systemParams.electrum,
+          },
+        }
+      );
+
+      if (error) throw error;
+
+      if (!data.success) {
+        throw new Error(data.error || "Consolidation failed");
+      }
+
+      // Mark batch as completed
+      setBatches(prev => prev.map(b => 
+        b.id === batchId 
+          ? { ...b, isProcessing: false, isCompleted: true, txid: data.txid } 
+          : b
+      ));
+
+      toast.success(
+        `Batch #${batchId} consolidated successfully! TX: ${data.txid.substring(0, 16)}...`,
+        { duration: 5000 }
+      );
+
+      console.log(`✅ Batch ${batchId} consolidated:`, data);
+    } catch (error) {
+      console.error(`❌ Batch ${batchId} consolidation error:`, error);
+      
+      // Reset processing state
+      setBatches(prev => prev.map(b => 
+        b.id === batchId ? { ...b, isProcessing: false } : b
+      ));
+
+      toast.error(
+        error instanceof Error 
+          ? `Consolidation failed: ${error.message}` 
+          : "Consolidation failed"
+      );
+    }
   };
 
   return (
@@ -506,10 +581,19 @@ const WalletConsolidate = () => {
                     </div>
                     <Button
                       onClick={() => handleConsolidateBatch(batch.id)}
-                      disabled={!privateKey.trim()}
+                      disabled={!privateKey.trim() || batch.isProcessing || batch.isCompleted}
                       className="ml-4"
                     >
-                      Consolidate
+                      {batch.isProcessing ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                          Processing...
+                        </>
+                      ) : batch.isCompleted ? (
+                        "✓ Completed"
+                      ) : (
+                        "Consolidate"
+                      )}
                     </Button>
                   </div>
                 </Card>
