@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-const DUST_THRESHOLD = 10000; // Less than 10,000 satoshis is considered dust
+const DUST_THRESHOLD = 10000; // Less than 10,000 lanoshis is considered dust
 
 async function connectElectrum(servers: any[], maxRetries = 3) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -136,7 +136,7 @@ serve(async (req) => {
       value_lana: (utxo.value / 100000000).toFixed(8)
     }));
     
-    // Filter dust UTXOs (< 10,000 satoshis)
+    // Filter dust UTXOs (< 10,000 lanoshis)
     const dustUtxos = sortedUTXOs.filter((utxo: any) => utxo.value < DUST_THRESHOLD);
     const dustValue = dustUtxos.reduce((sum: number, utxo: any) => sum + utxo.value, 0);
     
