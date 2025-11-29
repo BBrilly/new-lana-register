@@ -10,6 +10,15 @@ import NostrStatusDialog from "@/components/NostrStatusDialog";
 import BlockDetailDialog from "@/components/BlockDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -26,6 +35,9 @@ const LandingPage = () => {
   const [recentBlocks, setRecentBlocks] = useState<any[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalBlocks, setTotalBlocks] = useState(0);
+  const BLOCKS_PER_PAGE = 50;
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -99,12 +111,22 @@ const LandingPage = () => {
           totalAmount: totalAmount,
         });
 
-        // Fetch recent blocks
+        // Get total block count
+        const { count } = await supabase
+          .from('block_tx')
+          .select('*', { count: 'exact', head: true });
+        
+        setTotalBlocks(count || 0);
+
+        // Fetch recent blocks with pagination
+        const from = (currentPage - 1) * BLOCKS_PER_PAGE;
+        const to = from + BLOCKS_PER_PAGE - 1;
+        
         const { data: blocks } = await supabase
           .from('block_tx')
           .select('*')
           .order('block_id', { ascending: false })
-          .limit(10);
+          .range(from, to);
 
         if (blocks) {
           const formattedBlocks = blocks.map(block => {
@@ -137,10 +159,40 @@ const LandingPage = () => {
     };
 
     loadBlockchainData();
-  }, []);
+  }, [currentPage]);
 
   const connectedRelays = relayStatuses.filter(r => r.connected).length;
   const totalRelays = relayStatuses.length;
+  
+  const totalPages = Math.ceil(totalBlocks / BLOCKS_PER_PAGE);
+  
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 10;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 6) {
+        for (let i = 1; i <= 8; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 5) {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = totalPages - 7; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = currentPage - 2; i <= currentPage + 2; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -339,6 +391,63 @@ const LandingPage = () => {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * BLOCKS_PER_PAGE) + 1} to {Math.min(currentPage * BLOCKS_PER_PAGE, totalBlocks)} of {totalBlocks} blocks
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          setCurrentPage(p => p - 1);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {getPageNumbers().map((page, idx) => (
+                    page === 'ellipsis' ? (
+                      <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => {
+                            setCurrentPage(page as number);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  ))}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => {
+                        if (currentPage < totalPages) {
+                          setCurrentPage(p => p + 1);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </Card>
       </div>
 
