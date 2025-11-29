@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
       console.log(`Processing block ${height}...`);
 
       const blockHash = await rpcCall('getblockhash', [height]);
-      const block: BlockInfo = await rpcCall('getblock', [blockHash, 1]);
+      const block: BlockInfo = await rpcCall('getblock', [blockHash, true]);
 
       let blockTxCount = 0;
       let registeredTxCount = 0;
@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
         blockTxCount++;
 
         try {
-          const tx: Transaction = await rpcCall('getrawtransaction', [txid, 1]);
+          const tx: Transaction = await rpcCall('getrawtransaction', [txid, true]);
           
           let fromWalletId: string | null = null;
           let toWalletId: string | null = null;
