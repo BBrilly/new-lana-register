@@ -1,18 +1,35 @@
 import { SimplePool, Event } from "nostr-tools";
 import { UserProfile } from "./wifAuth";
 
-const RELAYS = [
-  "wss://relay.damus.io",
-  "wss://relay.nostr.band",
-  "wss://nos.lol"
+const DEFAULT_LANA_RELAYS = [
+  "wss://nostr1.lanacoin.com",
+  "wss://relay.lanaheartvoice.com",
+  "wss://relay.lovelana.org",
+  "wss://relay.lanavault.space",
+  "wss://relay.lanacoin-eternity.com"
 ];
 
 export async function fetchUserProfile(publicKeyHex: string): Promise<UserProfile | null> {
   const pool = new SimplePool();
   
+  // Get relays from sessionStorage (system_parameters) or use defaults
+  let relays = DEFAULT_LANA_RELAYS;
+  const storedParams = sessionStorage.getItem('lana_system_parameters');
+  if (storedParams) {
+    try {
+      const params = JSON.parse(storedParams);
+      if (params.relays && params.relays.length > 0) {
+        relays = params.relays;
+        console.log(`Using ${relays.length} relays from system parameters`);
+      }
+    } catch (e) {
+      console.warn("Failed to parse system parameters, using default LanaCoin relays");
+    }
+  }
+  
   try {
     // Fetch KIND 0 events for the user
-    const events = await pool.querySync(RELAYS, {
+    const events = await pool.querySync(relays, {
       kinds: [0],
       authors: [publicKeyHex],
       limit: 1
@@ -40,7 +57,7 @@ export async function fetchUserProfile(publicKeyHex: string): Promise<UserProfil
     console.error("Error fetching user profile:", error);
     return null;
   } finally {
-    pool.close(RELAYS);
+    pool.close(relays);
   }
 }
 
