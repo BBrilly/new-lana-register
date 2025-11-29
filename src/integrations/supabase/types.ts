@@ -377,6 +377,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      blockchain_monitor_cron: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
