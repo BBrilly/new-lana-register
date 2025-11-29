@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
 import NostrStatusDialog from "@/components/NostrStatusDialog";
+import BlockDetailDialog from "@/components/BlockDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 
@@ -23,6 +24,8 @@ const LandingPage = () => {
     totalAmount: 0,
   });
   const [recentBlocks, setRecentBlocks] = useState<any[]>([]);
+  const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -303,7 +306,14 @@ const LandingPage = () => {
               </TableHeader>
               <TableBody>
                 {recentBlocks.map((block) => (
-                  <TableRow key={block.id}>
+                  <TableRow 
+                    key={block.id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setSelectedBlock(block);
+                      setShowBlockDialog(true);
+                    }}
+                  >
                     <TableCell className="font-mono font-medium">{block.id}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -346,6 +356,22 @@ const LandingPage = () => {
         systemParams={systemParams}
         relayStatuses={relayStatuses}
       />
+
+      {/* Block Detail Dialog */}
+      {selectedBlock && (
+        <BlockDetailDialog
+          open={showBlockDialog}
+          onOpenChange={setShowBlockDialog}
+          blockId={selectedBlock.id}
+          blockData={{
+            stakedTime: selectedBlock.stakedTime,
+            auditTime: selectedBlock.auditTime,
+            totalTx: selectedBlock.totalTx,
+            registeredTx: selectedBlock.registeredTx,
+            coverage: selectedBlock.coverage,
+          }}
+        />
+      )}
     </div>
   );
 };
