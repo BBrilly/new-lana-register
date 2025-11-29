@@ -63,25 +63,32 @@ Deno.serve(async (req) => {
       
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
+          const payload = {
+            jsonrpc: '2.0',
+            id: method,
+            method,
+            params,
+          };
+          
+          console.log(`RPC Request (${method}):`, JSON.stringify(payload));
+          
           const response = await fetch(`http://${rpcNode.host}:${rpcNode.port}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               ...(auth && { 'Authorization': `Basic ${auth}` }),
             },
-            body: JSON.stringify({
-              jsonrpc: '1.0',
-              id: `${method}-${Date.now()}`,
-              method,
-              params,
-            }),
+            body: JSON.stringify(payload),
           });
 
+          const responseText = await response.text();
+          console.log(`RPC Response (${method}, status ${response.status}):`, responseText);
+
           if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${responseText}`);
           }
 
-          const data = await response.json();
+          const data = JSON.parse(responseText);
           if (data.error) {
             throw new Error(`RPC Error: ${JSON.stringify(data.error)}`);
           }
