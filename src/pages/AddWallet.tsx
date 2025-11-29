@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { QrCode, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { validateLanaAddress } from "@/utils/walletValidation";
 
 const AddWallet = () => {
   const navigate = useNavigate();
@@ -76,7 +77,20 @@ const AddWallet = () => {
     setIsValid(false);
 
     try {
-      // First check if wallet already exists in database
+      // Step 1: Validate address structure first
+      console.log('🔍 Validating wallet address structure...');
+      const structureValidation = await validateLanaAddress(walletId);
+      
+      if (!structureValidation.valid) {
+        setValidationError(structureValidation.error || "Invalid wallet address format");
+        setIsValid(false);
+        setIsValidating(false);
+        return;
+      }
+      
+      console.log('✅ Wallet address structure is valid');
+
+      // Step 2: Check if wallet already exists in database
       const { data: existingWallet, error: walletCheckError } = await supabase
         .from("wallets")
         .select("id, wallet_id")
@@ -94,7 +108,7 @@ const AddWallet = () => {
         return;
       }
 
-      // Fetch system parameters for electrum servers
+      // Step 3: Fetch system parameters for electrum servers
       const { data: systemParams, error: paramsError } = await supabase
         .from("system_parameters")
         .select("electrum")
@@ -115,7 +129,7 @@ const AddWallet = () => {
         port: parseInt(server.port, 10)
       }));
 
-      // Call edge function to check balance
+      // Step 4: Call edge function to check balance
       const { data, error } = await supabase.functions.invoke("fetch-wallet-balance", {
         body: {
           wallet_addresses: [walletId],
@@ -131,7 +145,7 @@ const AddWallet = () => {
         throw new Error(data?.error || "Failed to fetch wallet balance");
       }
 
-      // Check if balance is 0
+      // Step 5: Check if balance is 0
       const walletBalance = data.wallets[0]?.balance || 0;
       
       if (walletBalance > 0) {
