@@ -69,7 +69,17 @@ export const useUserWallets = () => {
           notification: undefined, // MOCK - will be implemented later
         }));
 
-        setWallets(mappedWallets);
+        // Sort wallets: Main wallet first, then others
+        const sortedWallets = mappedWallets.sort((a, b) => {
+          const aIsMain = a.type.toLowerCase().includes("main");
+          const bIsMain = b.type.toLowerCase().includes("main");
+          
+          if (aIsMain && !bIsMain) return -1;
+          if (!aIsMain && bIsMain) return 1;
+          return 0;
+        });
+
+        setWallets(sortedWallets);
       } catch (err) {
         console.error("Error fetching wallets:", err);
         setError(err instanceof Error ? err.message : "Failed to fetch wallets");

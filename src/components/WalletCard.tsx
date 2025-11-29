@@ -48,20 +48,31 @@ const WalletCard = ({ wallet, onDelete }: WalletCardProps) => {
     }
   };
 
+  const isMainWallet = wallet.type.toLowerCase().includes("main");
+  const isLana8Wonder = wallet.type.toLowerCase().includes("lana8wonder");
+  
+  const cardBorderClass = isMainWallet 
+    ? "border-success/50 bg-success/5" 
+    : isLana8Wonder 
+    ? "border-orange-500/50 bg-orange-500/5" 
+    : "";
+
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-md">
+    <Card className={`overflow-hidden transition-all hover:shadow-md ${cardBorderClass}`}>
       <div className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <WalletIcon className="h-6 w-6 text-primary" />
+            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isMainWallet ? "bg-success/10" : isLana8Wonder ? "bg-orange-500/10" : "bg-primary/10"}`}>
+              <WalletIcon className={`h-6 w-6 ${isMainWallet ? "text-success" : isLana8Wonder ? "text-orange-500" : "text-primary"}`} />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-foreground">{wallet.description}</h3>
-                <Badge className={getTypeColor(wallet.type)}>{wallet.type}</Badge>
+                <h3 className="text-lg font-semibold text-foreground">{wallet.type}</h3>
+                {isMainWallet && <Badge className="bg-success/10 text-success">Main</Badge>}
+                {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
               </div>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">{wallet.walletNumber}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{wallet.description}</p>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">ID: {wallet.walletNumber}</p>
             </div>
           </div>
           <Button
