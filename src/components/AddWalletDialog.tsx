@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ import { toast } from "sonner";
 interface AddWalletDialogProps {
   onAdd: (wallet: {
     walletNumber: string;
-    type: "Hardware" | "Software" | "Exchange";
+    type: string;
     description: string;
   }) => void;
 }
@@ -32,8 +33,30 @@ interface AddWalletDialogProps {
 const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
   const [open, setOpen] = useState(false);
   const [walletNumber, setWalletNumber] = useState("");
-  const [type, setType] = useState<"Hardware" | "Software" | "Exchange">("Hardware");
+  const [type, setType] = useState("");
   const [description, setDescription] = useState("");
+  const [walletTypes, setWalletTypes] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    const fetchWalletTypes = async () => {
+      const { data, error } = await supabase
+        .from("wallet_types")
+        .select("id, name")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching wallet types:", error);
+        toast.error("Failed to load wallet types");
+      } else if (data) {
+        setWalletTypes(data);
+        if (data.length > 0 && !type) {
+          setType(data[0].name);
+        }
+      }
+    };
+
+    fetchWalletTypes();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +67,7 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
     onAdd({ walletNumber, type, description });
     setWalletNumber("");
     setDescription("");
-    setType("Hardware");
+    setType(walletTypes.length > 0 ? walletTypes[0].name : "");
     setOpen(false);
     toast.success("Wallet successfully added!");
   };
@@ -82,9 +105,11 @@ const AddWalletDialog = ({ onAdd }: AddWalletDialogProps) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Hardware">Hardware</SelectItem>
-                <SelectItem value="Software">Software</SelectItem>
-                <SelectItem value="Exchange">Exchange</SelectItem>
+                {walletTypes.map((walletType) => (
+                  <SelectItem key={walletType.id} value={walletType.name}>
+                    {walletType.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
