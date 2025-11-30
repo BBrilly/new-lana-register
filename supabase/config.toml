@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.fetch-wallet-balance]
 verify_jwt = false
+
+[functions.sync-profile-data]
+verify_jwt = false
