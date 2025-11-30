@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     // Fetch all main wallets
     const { data: mainWallets, error: walletsError } = await supabase
       .from('main_wallets')
-      .select('id, nostr_hex_id, name, display_name');
+      .select('id, nostr_hex_id, name, display_name, profile_pic_link');
 
     if (walletsError) {
       console.error('❌ Error fetching main wallets:', walletsError);
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     console.log(`👥 Found ${mainWallets.length} main wallets to check`);
 
     // Check if we need to fetch all or just recent
-    const hasEmptyProfiles = mainWallets.some(w => !w.name || !w.display_name);
+    const hasEmptyProfiles = mainWallets.some(w => !w.name || !w.display_name || !w.profile_pic_link);
     const timeFilter = hasEmptyProfiles 
       ? undefined 
       : Math.floor(Date.now() / 1000) - (20 * 60); // Last 20 minutes
@@ -137,7 +137,8 @@ Deno.serve(async (req) => {
         // Only update if there are changes
         const needsUpdate = 
           profile.name !== wallet.name || 
-          profile.display_name !== wallet.display_name;
+          profile.display_name !== wallet.display_name ||
+          profile.picture !== wallet.profile_pic_link;
 
         if (!needsUpdate) {
           console.log(`⏭️ Skipping ${pubkey.substring(0, 8)}... (no changes)`);
@@ -149,6 +150,7 @@ Deno.serve(async (req) => {
           .update({
             name: profile.name || null,
             display_name: profile.display_name || null,
+            profile_pic_link: profile.picture || null,
             updated_at: new Date().toISOString(),
           })
           .eq('nostr_hex_id', pubkey);
