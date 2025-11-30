@@ -177,11 +177,11 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
             <div className="grid gap-4 md:grid-cols-3">
               <div>
                 <p className="text-sm text-muted-foreground">Total Transactions</p>
-                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-2xl font-bold">{blockData.totalTx}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Registered Transactions</p>
-                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-2xl font-bold">{blockData.registeredTx}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Value</p>
