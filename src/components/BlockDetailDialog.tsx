@@ -40,12 +40,19 @@ interface TxOutput {
   value: number;
 }
 
+interface TxInput {
+  index: number;
+  address: string;
+  value: number;
+}
+
 interface BlockTransaction {
   txid: string;
   inputs: number;
   outputs: number;
   totalValue: number;
   isRegistered: boolean;
+  inputDetails: TxInput[];
   outputDetails: TxOutput[];
 }
 
@@ -66,13 +73,19 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
         const mockTransactions: BlockTransaction[] = Array.from(
           { length: blockData.totalTx },
           (_, i) => {
+            const inputs = Math.floor(Math.random() * 5) + 1;
             const outputs = Math.floor(Math.random() * 10) + 1;
             return {
               txid: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`.substring(0, 64),
-              inputs: Math.floor(Math.random() * 5) + 1,
+              inputs,
               outputs,
               totalValue: Math.random() * 1000,
               isRegistered: i < blockData.registeredTx,
+              inputDetails: Array.from({ length: inputs }, (_, j) => ({
+                index: j,
+                address: `Lan${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
+                value: Math.random() * 100
+              })),
               outputDetails: Array.from({ length: outputs }, (_, j) => ({
                 index: j,
                 address: `Lan${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
@@ -277,26 +290,54 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                         </TableRow>
                         {expandedTxId === tx.txid && (
                           <TableRow>
-                            <TableCell colSpan={6} className="bg-muted/30 p-4">
-                              <div className="text-sm font-semibold mb-2">Transaction Outputs:</div>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="w-16">#</TableHead>
-                                    <TableHead>Address</TableHead>
-                                    <TableHead className="text-right">Value (LANA)</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {tx.outputDetails.map((output) => (
-                                    <TableRow key={output.index}>
-                                      <TableCell>{output.index}</TableCell>
-                                      <TableCell className="font-mono text-xs">{output.address}</TableCell>
-                                      <TableCell className="text-right">{output.value.toFixed(4)}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                            <TableCell colSpan={6} className="bg-muted/30 p-6">
+                              <div className="grid md:grid-cols-2 gap-6">
+                                {/* Input Addresses */}
+                                <div>
+                                  <div className="text-sm font-semibold mb-3 text-destructive">From (Inputs):</div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-16">#</TableHead>
+                                        <TableHead>Address</TableHead>
+                                        <TableHead className="text-right">Value (LANA)</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {tx.inputDetails.map((input) => (
+                                        <TableRow key={input.index}>
+                                          <TableCell>{input.index}</TableCell>
+                                          <TableCell className="font-mono text-xs">{input.address}</TableCell>
+                                          <TableCell className="text-right">{input.value.toFixed(4)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+
+                                {/* Output Addresses */}
+                                <div>
+                                  <div className="text-sm font-semibold mb-3 text-primary">To (Outputs):</div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-16">#</TableHead>
+                                        <TableHead>Address</TableHead>
+                                        <TableHead className="text-right">Value (LANA)</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {tx.outputDetails.map((output) => (
+                                        <TableRow key={output.index}>
+                                          <TableCell>{output.index}</TableCell>
+                                          <TableCell className="font-mono text-xs">{output.address}</TableCell>
+                                          <TableCell className="text-right">{output.value.toFixed(4)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )}
