@@ -226,7 +226,80 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
             </div>
           </Card>
 
-          {/* Transactions Table */}
+          {/* Registered Transactions Preview */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              Registered Transactions
+            </h3>
+            
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead className="text-right">Inputs</TableHead>
+                      <TableHead className="text-right">Outputs</TableHead>
+                      <TableHead className="text-right">Total Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions
+                      .filter(tx => tx.isRegistered)
+                      .slice(0, 5)
+                      .map((tx, index) => (
+                        <TableRow 
+                          key={tx.txid}
+                          onClick={() => setExpandedTxId(expandedTxId === tx.txid ? null : tx.txid)}
+                          className="cursor-pointer hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {expandedTxId === tx.txid ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              {index + 1}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
+                          </TableCell>
+                          <TableCell className="text-right">{tx.inputs}</TableCell>
+                          <TableCell className="text-right font-semibold">{tx.outputs}</TableCell>
+                          <TableCell className="text-right">
+                            {tx.totalValue.toFixed(4)} LAN
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {transactions.filter(tx => tx.isRegistered).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No registered transactions in this block
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+                {transactions.filter(tx => tx.isRegistered).length > 5 && (
+                  <div className="mt-4 text-sm text-muted-foreground text-center">
+                    Showing 5 of {transactions.filter(tx => tx.isRegistered).length} registered transactions. 
+                    See full list below.
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* All Block Transactions */}
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />
