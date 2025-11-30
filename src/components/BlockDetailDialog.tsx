@@ -61,6 +61,10 @@ interface RegisteredTransaction {
   id: string;
   from_wallet_address: string | null;
   to_wallet_address: string | null;
+  from_wallet_name: string | null;
+  from_wallet_display_name: string | null;
+  to_wallet_name: string | null;
+  to_wallet_display_name: string | null;
   amount: number;
   notes: string | null;
   created_at: string;
@@ -125,8 +129,14 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
             amount,
             notes,
             created_at,
-            from_wallet:wallets!transactions_from_wallet_id_fkey(wallet_id),
-            to_wallet:wallets!transactions_to_wallet_id_fkey(wallet_id)
+            from_wallet:wallets!transactions_from_wallet_id_fkey(
+              wallet_id,
+              main_wallet:main_wallets(name, display_name)
+            ),
+            to_wallet:wallets!transactions_to_wallet_id_fkey(
+              wallet_id,
+              main_wallet:main_wallets(name, display_name)
+            )
           `)
           .eq('block_id', parseInt(blockId.replace('#', '')))
           .order('created_at', { ascending: false });
@@ -136,6 +146,10 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
             id: tx.id,
             from_wallet_address: (tx.from_wallet as any)?.wallet_id || null,
             to_wallet_address: (tx.to_wallet as any)?.wallet_id || null,
+            from_wallet_name: (tx.from_wallet as any)?.main_wallet?.name || null,
+            from_wallet_display_name: (tx.from_wallet as any)?.main_wallet?.display_name || null,
+            to_wallet_name: (tx.to_wallet as any)?.main_wallet?.name || null,
+            to_wallet_display_name: (tx.to_wallet as any)?.main_wallet?.display_name || null,
             amount: Number(tx.amount),
             notes: tx.notes,
             created_at: tx.created_at || ''
@@ -302,15 +316,33 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                     {registeredTransactions.map((tx, index) => (
                       <TableRow key={tx.id}>
                         <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {tx.from_wallet_address 
-                            ? `${tx.from_wallet_address.substring(0, 8)}...${tx.from_wallet_address.slice(-6)}`
-                            : '-'}
+                        <TableCell>
+                          {tx.from_wallet_address ? (
+                            <div className="flex flex-col gap-1">
+                              {(tx.from_wallet_display_name || tx.from_wallet_name) && (
+                                <div className="font-medium text-sm">
+                                  {tx.from_wallet_display_name || tx.from_wallet_name}
+                                </div>
+                              )}
+                              <div className="font-mono text-xs text-muted-foreground">
+                                {`${tx.from_wallet_address.substring(0, 8)}...${tx.from_wallet_address.slice(-6)}`}
+                              </div>
+                            </div>
+                          ) : '-'}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {tx.to_wallet_address 
-                            ? `${tx.to_wallet_address.substring(0, 8)}...${tx.to_wallet_address.slice(-6)}`
-                            : '-'}
+                        <TableCell>
+                          {tx.to_wallet_address ? (
+                            <div className="flex flex-col gap-1">
+                              {(tx.to_wallet_display_name || tx.to_wallet_name) && (
+                                <div className="font-medium text-sm">
+                                  {tx.to_wallet_display_name || tx.to_wallet_name}
+                                </div>
+                              )}
+                              <div className="font-mono text-xs text-muted-foreground">
+                                {`${tx.to_wallet_address.substring(0, 8)}...${tx.to_wallet_address.slice(-6)}`}
+                              </div>
+                            </div>
+                          ) : '-'}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
                           {tx.amount.toFixed(4)}
