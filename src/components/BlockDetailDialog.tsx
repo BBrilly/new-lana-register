@@ -128,7 +128,7 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
             from_wallet:wallets!transactions_from_wallet_id_fkey(wallet_id),
             to_wallet:wallets!transactions_to_wallet_id_fkey(wallet_id)
           `)
-          .eq('block_id', parseInt(blockId))
+          .eq('block_id', parseInt(blockId.replace('#', '')))
           .order('created_at', { ascending: false });
         
         if (!error && data) {
