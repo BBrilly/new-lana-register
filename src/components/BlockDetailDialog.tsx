@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,17 +34,26 @@ interface BlockDetailDialogProps {
   };
 }
 
-interface WalletInfo {
-  wallet_id: string | null;
-  wallet_type: string;
+interface TxOutput {
+  index: number;
+  address: string;
+  value: number;
+}
+
+interface TxInput {
+  index: number;
+  address: string;
+  value: number;
 }
 
 interface BlockTransaction {
-  id: string;
-  amount: number;
-  from_wallet: WalletInfo | null;
-  to_wallet: WalletInfo | null;
-  notes: string | null;
+  txid: string;
+  inputs: number;
+  outputs: number;
+  totalValue: number;
+  isRegistered: boolean;
+  inputDetails: TxInput[];
+  outputDetails: TxOutput[];
 }
 
 const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDetailDialogProps) => {
@@ -57,41 +65,45 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
 
   useEffect(() => {
     if (open) {
+      // Mock data - in production this would fetch from RPC node or database
       setIsLoading(true);
-      setCurrentPage(1);
-      
-      const fetchTransactions = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('transactions')
-            .select(`
-              id,
-              amount,
-              notes,
-              from_wallet:wallets!from_wallet_id(wallet_id, wallet_type),
-              to_wallet:wallets!to_wallet_id(wallet_id, wallet_type)
-            `)
-            .eq('block_id', parseInt(blockId));
-
-          if (error) {
-            console.error('Error fetching transactions:', error);
-            setTransactions([]);
-          } else {
-            setTransactions(data || []);
+      setCurrentPage(1); // Reset to first page when opening
+      setTimeout(() => {
+        // Generate mock transaction data for demonstration
+        const mockTransactions: BlockTransaction[] = Array.from(
+          { length: blockData.totalTx },
+          (_, i) => {
+            const inputs = Math.floor(Math.random() * 5) + 1;
+            const outputs = Math.floor(Math.random() * 10) + 1;
+            return {
+              txid: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`.substring(0, 64),
+              inputs,
+              outputs,
+              totalValue: Math.random() * 1000,
+              isRegistered: i < blockData.registeredTx,
+              inputDetails: Array.from({ length: inputs }, (_, j) => ({
+                index: j,
+                address: `Lan${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
+                value: Math.random() * 100
+              })),
+              outputDetails: Array.from({ length: outputs }, (_, j) => ({
+                index: j,
+                address: `Lan${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
+                value: Math.random() * 100
+              }))
+            };
           }
-        } catch (err) {
-          console.error('Failed to fetch transactions:', err);
-          setTransactions([]);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      fetchTransactions();
+        );
+        setTransactions(mockTransactions);
+        setIsLoading(false);
+      }, 500);
     }
-  }, [open, blockId]);
+  }, [open, blockId, blockData]);
 
-  const totalValue = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const totalInputs = transactions.reduce((sum, tx) => sum + tx.inputs, 0);
+  const totalOutputs = transactions.reduce((sum, tx) => sum + tx.outputs, 0);
+  const totalValue = transactions.reduce((sum, tx) => sum + tx.totalValue, 0);
+  const avgOutputsPerTx = transactions.length > 0 ? (totalOutputs / transactions.length).toFixed(1) : 0;
 
   // Pagination logic
   const totalPages = Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE);
@@ -174,18 +186,22 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
               <TrendingUp className="h-5 w-5 text-primary" />
               Transaction Statistics
             </h3>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div>
                 <p className="text-sm text-muted-foreground">Total Transactions</p>
-                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-2xl font-bold">{blockData.totalTx}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Registered Transactions</p>
-                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-sm text-muted-foreground">Total Inputs</p>
+                <p className="text-2xl font-bold">{totalInputs}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
-                <p className="text-2xl font-bold">{totalValue.toFixed(4)} LANA</p>
+                <p className="text-sm text-muted-foreground">Total Outputs</p>
+                <p className="text-2xl font-bold">{totalOutputs}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Avg Outputs/TX</p>
+                <p className="text-2xl font-bold">{avgOutputsPerTx}</p>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t">
@@ -229,43 +245,103 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>From Wallet</TableHead>
-                      <TableHead>To Wallet</TableHead>
-                      <TableHead className="text-right">Amount (LANA)</TableHead>
-                      <TableHead>Notes</TableHead>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead className="text-right">Inputs</TableHead>
+                      <TableHead className="text-right">Outputs</TableHead>
+                      <TableHead className="text-right">Total Value</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentTransactions.map((tx, index) => (
-                      <TableRow key={tx.id}>
-                        <TableCell className="font-medium">{startIndex + index + 1}</TableCell>
-                        <TableCell>
-                          {tx.from_wallet ? (
-                            <div>
-                              <div className="font-mono text-xs">{tx.from_wallet.wallet_id}</div>
-                              <div className="text-xs text-muted-foreground">{tx.from_wallet.wallet_type}</div>
+                      <>
+                        <TableRow 
+                          key={tx.txid}
+                          onClick={() => setExpandedTxId(expandedTxId === tx.txid ? null : tx.txid)}
+                          className="cursor-pointer hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {expandedTxId === tx.txid ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              {startIndex + index + 1}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">Unknown</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {tx.to_wallet ? (
-                            <div>
-                              <div className="font-mono text-xs">{tx.to_wallet.wallet_id}</div>
-                              <div className="text-xs text-muted-foreground">{tx.to_wallet.wallet_type}</div>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">Unknown</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {Number(tx.amount).toFixed(4)}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                          {tx.notes || '-'}
-                        </TableCell>
-                      </TableRow>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
+                          </TableCell>
+                          <TableCell className="text-right">{tx.inputs}</TableCell>
+                          <TableCell className="text-right font-semibold">{tx.outputs}</TableCell>
+                          <TableCell className="text-right">
+                            {tx.totalValue.toFixed(4)} LAN
+                          </TableCell>
+                          <TableCell>
+                            {tx.isRegistered ? (
+                              <Badge variant="default" className="bg-primary">
+                                Registered
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">Unregistered</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {expandedTxId === tx.txid && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="bg-muted/30 p-6">
+                              <div className="grid md:grid-cols-2 gap-6">
+                                {/* Input Addresses */}
+                                <div>
+                                  <div className="text-sm font-semibold mb-3 text-destructive">From (Inputs):</div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-16">#</TableHead>
+                                        <TableHead>Address</TableHead>
+                                        <TableHead className="text-right">Value (LANA)</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {tx.inputDetails.map((input) => (
+                                        <TableRow key={input.index}>
+                                          <TableCell>{input.index}</TableCell>
+                                          <TableCell className="font-mono text-xs">{input.address}</TableCell>
+                                          <TableCell className="text-right">{input.value.toFixed(4)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+
+                                {/* Output Addresses */}
+                                <div>
+                                  <div className="text-sm font-semibold mb-3 text-primary">To (Outputs):</div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-16">#</TableHead>
+                                        <TableHead>Address</TableHead>
+                                        <TableHead className="text-right">Value (LANA)</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {tx.outputDetails.map((output) => (
+                                        <TableRow key={output.index}>
+                                          <TableCell>{output.index}</TableCell>
+                                          <TableCell className="font-mono text-xs">{output.address}</TableCell>
+                                          <TableCell className="text-right">{output.value.toFixed(4)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     ))}
                   </TableBody>
                 </Table>
