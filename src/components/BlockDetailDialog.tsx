@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { Database, Activity, TrendingUp, Package, ArrowRight } from "lucide-react";
+import { Database, Activity, TrendingUp, Package } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -21,7 +20,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { supabase } from "@/integrations/supabase/client";
 
 interface BlockDetailDialogProps {
   open: boolean;
@@ -37,125 +35,46 @@ interface BlockDetailDialogProps {
 }
 
 interface BlockTransaction {
-  id: string;
-  amount: number;
-  from_wallet_id: string | null;
-  to_wallet_id: string | null;
-  notes: string | null;
-  created_at: string | null;
-  to_wallet: {
-    wallet_id: string | null;
-    wallet_type: string;
-  } | null;
+  txid: string;
+  inputs: number;
+  outputs: number;
+  totalValue: number;
+  isRegistered: boolean;
 }
-
-interface TransactionDetailDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  transaction: BlockTransaction | null;
-}
-
-const TransactionDetailDialog = ({ open, onOpenChange, transaction }: TransactionDetailDialogProps) => {
-  if (!transaction) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            Transaction Outputs
-          </DialogTitle>
-          <DialogDescription>
-            Details of transaction outputs
-          </DialogDescription>
-        </DialogHeader>
-
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">From Wallet</p>
-                <p className="font-mono text-sm">{transaction.from_wallet_id || "N/A"}</p>
-              </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">To Wallet</p>
-                <p className="font-mono text-sm">{transaction.to_wallet_id || "N/A"}</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-              <div>
-                <p className="text-sm text-muted-foreground">Amount</p>
-                <p className="text-2xl font-bold">{transaction.amount} LAN</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Wallet Type</p>
-                <Badge variant="outline">{transaction.to_wallet?.wallet_type || "Unknown"}</Badge>
-              </div>
-            </div>
-
-            {transaction.notes && (
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground">Notes</p>
-                <p className="text-sm">{transaction.notes}</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDetailDialogProps) => {
+  const [transactions, setTransactions] = useState<BlockTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedTransaction, setSelectedTransaction] = useState<BlockTransaction | null>(null);
-  const [showTransactionDialog, setShowTransactionDialog] = useState(false);
   const TRANSACTIONS_PER_PAGE = 50;
 
-  const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ["block-transactions", blockId],
-    queryFn: async () => {
-      const blockIdNum = parseInt(blockId);
-      if (isNaN(blockIdNum)) {
-        console.error("Invalid block ID:", blockId);
-        return [];
-      }
+  useEffect(() => {
+    if (open) {
+      // Mock data - in production this would fetch from RPC node or database
+      setIsLoading(true);
+      setCurrentPage(1); // Reset to first page when opening
+      setTimeout(() => {
+        // Generate mock transaction data for demonstration
+        const mockTransactions: BlockTransaction[] = Array.from(
+          { length: blockData.totalTx },
+          (_, i) => ({
+            txid: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`.substring(0, 64),
+            inputs: Math.floor(Math.random() * 5) + 1,
+            outputs: Math.floor(Math.random() * 10) + 1,
+            totalValue: Math.random() * 1000,
+            isRegistered: i < blockData.registeredTx,
+          })
+        );
+        setTransactions(mockTransactions);
+        setIsLoading(false);
+      }, 500);
+    }
+  }, [open, blockId, blockData]);
 
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(`
-          id,
-          amount,
-          block_id,
-          notes,
-          to_wallet_id,
-          from_wallet_id,
-          created_at,
-          to_wallet:wallets!transactions_to_wallet_id_fkey(wallet_id, wallet_type)
-        `)
-        .eq("block_id", blockIdNum)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching transactions:", error);
-        throw error;
-      }
-
-      return data as BlockTransaction[];
-    },
-    enabled: open && !!blockId,
-  });
-
-  const totalValue = transactions.reduce((sum, tx) => sum + tx.amount, 0);
-  const registeredCount = transactions.filter(tx => tx.to_wallet?.wallet_id).length;
-
-  const handleTransactionClick = (transaction: BlockTransaction) => {
-    setSelectedTransaction(transaction);
-    setShowTransactionDialog(true);
-  };
+  const totalInputs = transactions.reduce((sum, tx) => sum + tx.inputs, 0);
+  const totalOutputs = transactions.reduce((sum, tx) => sum + tx.outputs, 0);
+  const totalValue = transactions.reduce((sum, tx) => sum + tx.totalValue, 0);
+  const avgOutputsPerTx = transactions.length > 0 ? (totalOutputs / transactions.length).toFixed(1) : 0;
 
   // Pagination logic
   const totalPages = Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE);
@@ -238,18 +157,42 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
               <TrendingUp className="h-5 w-5 text-primary" />
               Transaction Statistics
             </h3>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div>
                 <p className="text-sm text-muted-foreground">Total Transactions</p>
-                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-2xl font-bold">{blockData.totalTx}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
-                <p className="text-2xl font-bold">{totalValue.toFixed(2)} LAN</p>
+                <p className="text-sm text-muted-foreground">Total Inputs</p>
+                <p className="text-2xl font-bold">{totalInputs}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Registered</p>
-                <p className="text-2xl font-bold">{registeredCount}</p>
+                <p className="text-sm text-muted-foreground">Total Outputs</p>
+                <p className="text-2xl font-bold">{totalOutputs}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Avg Outputs/TX</p>
+                <p className="text-2xl font-bold">{avgOutputsPerTx}</p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Registered Transactions</p>
+                  <p className="text-xl font-semibold text-primary">{blockData.registeredTx}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Coverage</p>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-32 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${blockData.coverage}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold">{blockData.coverage}%</span>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>
@@ -273,41 +216,27 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>From Wallet</TableHead>
-                      <TableHead>To Wallet</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Type</TableHead>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead className="text-right">Inputs</TableHead>
+                      <TableHead className="text-right">Outputs</TableHead>
+                      <TableHead className="text-right">Total Value</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentTransactions.map((tx, index) => (
-                      <TableRow 
-                        key={tx.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => handleTransactionClick(tx)}
-                      >
+                      <TableRow key={tx.txid}>
                         <TableCell className="font-medium">{startIndex + index + 1}</TableCell>
                         <TableCell className="font-mono text-xs">
-                          {tx.from_wallet_id 
-                            ? `${tx.from_wallet_id.substring(0, 8)}...` 
-                            : "N/A"}
+                          {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {tx.to_wallet_id 
-                            ? `${tx.to_wallet_id.substring(0, 8)}...` 
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {tx.amount} LAN
+                        <TableCell className="text-right">{tx.inputs}</TableCell>
+                        <TableCell className="text-right font-semibold">{tx.outputs}</TableCell>
+                        <TableCell className="text-right">
+                          {tx.totalValue.toFixed(4)} LAN
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">
-                            {tx.to_wallet?.wallet_type || "Unknown"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {tx.to_wallet?.wallet_id ? (
+                          {tx.isRegistered ? (
                             <Badge variant="default" className="bg-primary">
                               Registered
                             </Badge>
@@ -368,12 +297,6 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
           </Card>
         </div>
       </DialogContent>
-
-      <TransactionDetailDialog
-        open={showTransactionDialog}
-        onOpenChange={setShowTransactionDialog}
-        transaction={selectedTransaction}
-      />
     </Dialog>
   );
 };
