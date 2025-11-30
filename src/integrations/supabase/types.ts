@@ -68,6 +68,7 @@ export type Database = {
       main_wallets: {
         Row: {
           created_at: string
+          display_name: string | null
           id: string
           name: string
           nostr_hex_id: string
@@ -78,6 +79,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           id?: string
           name: string
           nostr_hex_id: string
@@ -88,6 +90,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           id?: string
           name?: string
           nostr_hex_id?: string
