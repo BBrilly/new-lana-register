@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { Database, Activity, TrendingUp, Package } from "lucide-react";
+import { Database, Activity, TrendingUp, Package, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -34,18 +34,26 @@ interface BlockDetailDialogProps {
   };
 }
 
+interface TxOutput {
+  index: number;
+  address: string;
+  value: number;
+}
+
 interface BlockTransaction {
   txid: string;
   inputs: number;
   outputs: number;
   totalValue: number;
   isRegistered: boolean;
+  outputDetails: TxOutput[];
 }
 
 const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDetailDialogProps) => {
   const [transactions, setTransactions] = useState<BlockTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
   const TRANSACTIONS_PER_PAGE = 50;
 
   useEffect(() => {
@@ -57,13 +65,21 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
         // Generate mock transaction data for demonstration
         const mockTransactions: BlockTransaction[] = Array.from(
           { length: blockData.totalTx },
-          (_, i) => ({
-            txid: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`.substring(0, 64),
-            inputs: Math.floor(Math.random() * 5) + 1,
-            outputs: Math.floor(Math.random() * 10) + 1,
-            totalValue: Math.random() * 1000,
-            isRegistered: i < blockData.registeredTx,
-          })
+          (_, i) => {
+            const outputs = Math.floor(Math.random() * 10) + 1;
+            return {
+              txid: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`.substring(0, 64),
+              inputs: Math.floor(Math.random() * 5) + 1,
+              outputs,
+              totalValue: Math.random() * 1000,
+              isRegistered: i < blockData.registeredTx,
+              outputDetails: Array.from({ length: outputs }, (_, j) => ({
+                index: j,
+                address: `Lan${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
+                value: Math.random() * 100
+              }))
+            };
+          }
         );
         setTransactions(mockTransactions);
         setIsLoading(false);
@@ -225,26 +241,66 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                   </TableHeader>
                   <TableBody>
                     {currentTransactions.map((tx, index) => (
-                      <TableRow key={tx.txid}>
-                        <TableCell className="font-medium">{startIndex + index + 1}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
-                        </TableCell>
-                        <TableCell className="text-right">{tx.inputs}</TableCell>
-                        <TableCell className="text-right font-semibold">{tx.outputs}</TableCell>
-                        <TableCell className="text-right">
-                          {tx.totalValue.toFixed(4)} LAN
-                        </TableCell>
-                        <TableCell>
-                          {tx.isRegistered ? (
-                            <Badge variant="default" className="bg-primary">
-                              Registered
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary">Unregistered</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow 
+                          key={tx.txid}
+                          onClick={() => setExpandedTxId(expandedTxId === tx.txid ? null : tx.txid)}
+                          className="cursor-pointer hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {expandedTxId === tx.txid ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              {startIndex + index + 1}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
+                          </TableCell>
+                          <TableCell className="text-right">{tx.inputs}</TableCell>
+                          <TableCell className="text-right font-semibold">{tx.outputs}</TableCell>
+                          <TableCell className="text-right">
+                            {tx.totalValue.toFixed(4)} LAN
+                          </TableCell>
+                          <TableCell>
+                            {tx.isRegistered ? (
+                              <Badge variant="default" className="bg-primary">
+                                Registered
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">Unregistered</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {expandedTxId === tx.txid && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="bg-muted/30 p-4">
+                              <div className="text-sm font-semibold mb-2">Transaction Outputs:</div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-16">#</TableHead>
+                                    <TableHead>Address</TableHead>
+                                    <TableHead className="text-right">Value (LANA)</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {tx.outputDetails.map((output) => (
+                                    <TableRow key={output.index}>
+                                      <TableCell>{output.index}</TableCell>
+                                      <TableCell className="font-mono text-xs">{output.address}</TableCell>
+                                      <TableCell className="text-right">{output.value.toFixed(4)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     ))}
                   </TableBody>
                 </Table>
