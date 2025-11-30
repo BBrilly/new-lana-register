@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Database, Activity, TrendingUp, Package, ChevronDown, ChevronRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Pagination,
   PaginationContent,
@@ -56,11 +57,22 @@ interface BlockTransaction {
   outputDetails: TxOutput[];
 }
 
+interface RegisteredTransaction {
+  id: string;
+  from_wallet_address: string | null;
+  to_wallet_address: string | null;
+  amount: number;
+  notes: string | null;
+  created_at: string;
+}
+
 const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDetailDialogProps) => {
   const [transactions, setTransactions] = useState<BlockTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
+  const [registeredTransactions, setRegisteredTransactions] = useState<RegisteredTransaction[]>([]);
+  const [isLoadingRegistered, setIsLoadingRegistered] = useState(false);
   const TRANSACTIONS_PER_PAGE = 50;
 
   useEffect(() => {
@@ -99,6 +111,43 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
       }, 500);
     }
   }, [open, blockId, blockData]);
+
+  // Fetch registered transactions from Supabase
+  useEffect(() => {
+    if (open && blockId) {
+      const fetchRegisteredTransactions = async () => {
+        setIsLoadingRegistered(true);
+        
+        const { data, error } = await supabase
+          .from('transactions')
+          .select(`
+            id,
+            amount,
+            notes,
+            created_at,
+            from_wallet:wallets!transactions_from_wallet_id_fkey(wallet_id),
+            to_wallet:wallets!transactions_to_wallet_id_fkey(wallet_id)
+          `)
+          .eq('block_id', parseInt(blockId))
+          .order('created_at', { ascending: false });
+        
+        if (!error && data) {
+          const mapped: RegisteredTransaction[] = data.map(tx => ({
+            id: tx.id,
+            from_wallet_address: (tx.from_wallet as any)?.wallet_id || null,
+            to_wallet_address: (tx.to_wallet as any)?.wallet_id || null,
+            amount: Number(tx.amount),
+            notes: tx.notes,
+            created_at: tx.created_at || ''
+          }));
+          setRegisteredTransactions(mapped);
+        }
+        setIsLoadingRegistered(false);
+      };
+      
+      fetchRegisteredTransactions();
+    }
+  }, [open, blockId]);
 
   const totalInputs = transactions.reduce((sum, tx) => sum + tx.inputs, 0);
   const totalOutputs = transactions.reduce((sum, tx) => sum + tx.outputs, 0);
@@ -233,7 +282,7 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
               Registered Transactions
             </h3>
             
-            {isLoading ? (
+            {isLoadingRegistered ? (
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
@@ -244,57 +293,39 @@ const BlockDetailDialog = ({ open, onOpenChange, blockId, blockData }: BlockDeta
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>Transaction ID</TableHead>
-                      <TableHead className="text-right">Inputs</TableHead>
-                      <TableHead className="text-right">Outputs</TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
+                      <TableHead>From Wallet</TableHead>
+                      <TableHead>To Wallet</TableHead>
+                      <TableHead className="text-right">Amount (LANA)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transactions
-                      .filter(tx => tx.isRegistered)
-                      .slice(0, 5)
-                      .map((tx, index) => (
-                        <TableRow 
-                          key={tx.txid}
-                          onClick={() => setExpandedTxId(expandedTxId === tx.txid ? null : tx.txid)}
-                          className="cursor-pointer hover:bg-muted/50"
-                        >
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {expandedTxId === tx.txid ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              {index + 1}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {tx.txid.substring(0, 16)}...{tx.txid.substring(tx.txid.length - 8)}
-                          </TableCell>
-                          <TableCell className="text-right">{tx.inputs}</TableCell>
-                          <TableCell className="text-right font-semibold">{tx.outputs}</TableCell>
-                          <TableCell className="text-right">
-                            {tx.totalValue.toFixed(4)} LAN
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    {transactions.filter(tx => tx.isRegistered).length === 0 && (
+                    {registeredTransactions.map((tx, index) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {tx.from_wallet_address 
+                            ? `${tx.from_wallet_address.substring(0, 8)}...${tx.from_wallet_address.slice(-6)}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {tx.to_wallet_address 
+                            ? `${tx.to_wallet_address.substring(0, 8)}...${tx.to_wallet_address.slice(-6)}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {tx.amount.toFixed(4)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {registeredTransactions.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                           No registered transactions in this block
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
-                {transactions.filter(tx => tx.isRegistered).length > 5 && (
-                  <div className="mt-4 text-sm text-muted-foreground text-center">
-                    Showing 5 of {transactions.filter(tx => tx.isRegistered).length} registered transactions. 
-                    See full list below.
-                  </div>
-                )}
               </div>
             )}
           </Card>
