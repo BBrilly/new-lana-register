@@ -1,10 +1,10 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
 import NostrStatusDialog from "@/components/NostrStatusDialog";
 import BlockDetailDialog from "@/components/BlockDetailDialog";
@@ -20,6 +20,16 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+
+interface WalletWithBalance {
+  id: string;
+  wallet_id: string | null;
+  wallet_type: string;
+  name: string | null;
+  display_name: string | null;
+  balance: number;
+}
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -45,6 +55,13 @@ const LandingPage = () => {
   const [unregisteredPage, setUnregisteredPage] = useState(1);
   const [totalUnregistered, setTotalUnregistered] = useState(0);
   const EVENTS_PER_PAGE = 50;
+
+  // Wallet balances state
+  const [walletBalances, setWalletBalances] = useState<WalletWithBalance[]>([]);
+  const [walletsLoading, setWalletsLoading] = useState(false);
+  const [sortField, setSortField] = useState<'name' | 'balance'>('balance');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -232,6 +249,131 @@ const LandingPage = () => {
 
     loadUnregisteredEvents();
   }, [unregisteredPage]);
+
+  // Load wallet balances for the third tab
+  useEffect(() => {
+    const loadWalletBalances = async () => {
+      try {
+        setWalletsLoading(true);
+        
+        // Fetch wallets with types: Wallets, main Wallet, Knights
+        const { data: wallets } = await supabase
+          .from('wallets')
+          .select(`
+            id,
+            wallet_id,
+            wallet_type,
+            main_wallet:main_wallets(name, display_name)
+          `)
+          .in('wallet_type', ['Wallets', 'main Wallet', 'Knights']);
+
+        if (!wallets || wallets.length === 0) {
+          setWalletBalances([]);
+          return;
+        }
+
+        // Get wallet addresses for balance fetch
+        const walletAddresses = wallets
+          .filter(w => w.wallet_id)
+          .map(w => w.wallet_id as string);
+
+        if (walletAddresses.length === 0) {
+          setWalletBalances([]);
+          return;
+        }
+
+        // Fetch system parameters for Electrum servers
+        const { data: sysParams } = await supabase
+          .from('system_parameters')
+          .select('electrum')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!sysParams?.electrum) {
+          console.error('No Electrum servers configured');
+          return;
+        }
+
+        const electrumServers = (sysParams.electrum as any[]).map(server => ({
+          host: server.host,
+          port: parseInt(server.port, 10)
+        }));
+
+        // Fetch balances from edge function
+        const { data: balanceData, error: balanceError } = await supabase.functions.invoke(
+          'fetch-wallet-balance',
+          {
+            body: {
+              wallet_addresses: walletAddresses,
+              electrum_servers: electrumServers,
+            },
+          }
+        );
+
+        if (balanceError) {
+          console.error('Error fetching balances:', balanceError);
+        }
+
+        // Create balance map
+        const balanceMap = new Map<string, number>();
+        if (balanceData?.wallets) {
+          balanceData.wallets.forEach((w: any) => {
+            balanceMap.set(w.wallet_id, w.balance || 0);
+          });
+        }
+
+        // Map wallets with balances
+        const walletsWithBalances: WalletWithBalance[] = wallets.map(wallet => ({
+          id: wallet.id,
+          wallet_id: wallet.wallet_id,
+          wallet_type: wallet.wallet_type,
+          name: (wallet.main_wallet as any)?.name || null,
+          display_name: (wallet.main_wallet as any)?.display_name || null,
+          balance: balanceMap.get(wallet.wallet_id || '') || 0,
+        }));
+
+        setWalletBalances(walletsWithBalances);
+      } catch (error) {
+        console.error('Error loading wallet balances:', error);
+      } finally {
+        setWalletsLoading(false);
+      }
+    };
+
+    loadWalletBalances();
+  }, []);
+
+  // Sorted wallets
+  const sortedWallets = useMemo(() => {
+    return [...walletBalances].sort((a, b) => {
+      if (sortField === 'balance') {
+        return sortDirection === 'desc' ? b.balance - a.balance : a.balance - b.balance;
+      } else {
+        const nameA = (a.display_name || a.name || '').toLowerCase();
+        const nameB = (b.display_name || b.name || '').toLowerCase();
+        return sortDirection === 'desc' 
+          ? nameB.localeCompare(nameA)
+          : nameA.localeCompare(nameB);
+      }
+    });
+  }, [walletBalances, sortField, sortDirection]);
+
+  const toggleSort = (field: 'name' | 'balance') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const copyWalletId = (walletId: string) => {
+    navigator.clipboard.writeText(walletId);
+    setCopiedId(walletId);
+    toast.success('Wallet ID copied to clipboard');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const connectedRelays = relayStatuses.filter(r => r.connected).length;
   const totalRelays = relayStatuses.length;
@@ -446,6 +588,10 @@ const LandingPage = () => {
               <TabsTrigger value="unregistered" className="gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 Unregistered Lanas ({totalUnregistered})
+              </TabsTrigger>
+              <TabsTrigger value="wallets" className="gap-2">
+                <Wallet className="h-4 w-4" />
+                Wallet Balances ({walletBalances.length})
               </TabsTrigger>
             </TabsList>
 
@@ -681,6 +827,108 @@ const LandingPage = () => {
                       </PaginationItem>
                     </PaginationContent>
                   </Pagination>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Wallet Balances Tab */}
+            <TabsContent value="wallets">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Balance overview for Wallets, main Wallet and Knights wallet types
+                </p>
+              </div>
+
+              {walletsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -ml-3 font-medium"
+                            onClick={() => toggleSort('name')}
+                          >
+                            Name
+                            <ArrowUpDown className="h-3 w-3" />
+                          </Button>
+                        </TableHead>
+                        <TableHead>Wallet Type</TableHead>
+                        <TableHead>Wallet ID</TableHead>
+                        <TableHead className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -mr-3 font-medium"
+                            onClick={() => toggleSort('balance')}
+                          >
+                            Balance
+                            <ArrowUpDown className="h-3 w-3" />
+                          </Button>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedWallets.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No wallets found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        sortedWallets.map((wallet, index) => (
+                          <TableRow key={wallet.id}>
+                            <TableCell className="font-medium">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">
+                                {wallet.display_name || wallet.name || '-'}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {wallet.wallet_type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {wallet.wallet_id ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    {`${wallet.wallet_id.substring(0, 8)}...${wallet.wallet_id.slice(-6)}`}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => copyWalletId(wallet.wallet_id!)}
+                                  >
+                                    {copiedId === wallet.wallet_id ? (
+                                      <Check className="h-3 w-3 text-success" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </TabsContent>
