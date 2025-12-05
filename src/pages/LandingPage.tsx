@@ -344,9 +344,17 @@ const LandingPage = () => {
     loadWalletBalances();
   }, []);
 
-  // Sorted wallets
-  const sortedWallets = useMemo(() => {
-    return [...walletBalances].sort((a, b) => {
+  // Filter and sort wallets for different tabs
+  const knightsWallets = useMemo(() => {
+    return walletBalances.filter(w => w.wallet_type === 'Knights');
+  }, [walletBalances]);
+
+  const allWallets = useMemo(() => {
+    return walletBalances.filter(w => w.wallet_type === 'Wallet' || w.wallet_type === 'main Wallet');
+  }, [walletBalances]);
+
+  const sortWallets = (wallets: WalletWithBalance[]) => {
+    return [...wallets].sort((a, b) => {
       if (sortField === 'balance') {
         return sortDirection === 'desc' ? b.balance - a.balance : a.balance - b.balance;
       } else {
@@ -357,7 +365,13 @@ const LandingPage = () => {
           : nameA.localeCompare(nameB);
       }
     });
-  }, [walletBalances, sortField, sortDirection]);
+  };
+
+  const sortedKnightsWallets = useMemo(() => sortWallets(knightsWallets), [knightsWallets, sortField, sortDirection]);
+  const sortedAllWallets = useMemo(() => sortWallets(allWallets), [allWallets, sortField, sortDirection]);
+
+  const knightsTotalBalance = useMemo(() => knightsWallets.reduce((sum, w) => sum + w.balance, 0), [knightsWallets]);
+  const allWalletsTotalBalance = useMemo(() => allWallets.reduce((sum, w) => sum + w.balance, 0), [allWallets]);
 
   const toggleSort = (field: 'name' | 'balance') => {
     if (sortField === field) {
@@ -589,9 +603,13 @@ const LandingPage = () => {
                 <AlertTriangle className="h-4 w-4" />
                 Unregistered Lanas ({totalUnregistered})
               </TabsTrigger>
-              <TabsTrigger value="wallets" className="gap-2">
+              <TabsTrigger value="knights" className="gap-2">
+                <Shield className="h-4 w-4" />
+                Knights Wallets ({knightsWallets.length})
+              </TabsTrigger>
+              <TabsTrigger value="allwallets" className="gap-2">
                 <Wallet className="h-4 w-4" />
-                Wallet Balances ({walletBalances.length})
+                All Wallets ({allWallets.length})
               </TabsTrigger>
             </TabsList>
 
@@ -831,12 +849,118 @@ const LandingPage = () => {
               )}
             </TabsContent>
 
-            {/* Wallet Balances Tab */}
-            <TabsContent value="wallets">
-              <div className="mb-4">
+            {/* Knights Wallets Tab */}
+            <TabsContent value="knights">
+              <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Balance overview for Wallets, main Wallet and Knights wallet types
+                  Balance overview for Knights wallet type
                 </p>
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground">Total: </span>
+                  <span className="font-bold text-lg text-primary">
+                    {knightsTotalBalance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                  </span>
+                </div>
+              </div>
+
+              {walletsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -ml-3 font-medium"
+                            onClick={() => toggleSort('name')}
+                          >
+                            Name
+                            <ArrowUpDown className="h-3 w-3" />
+                          </Button>
+                        </TableHead>
+                        <TableHead>Wallet ID</TableHead>
+                        <TableHead className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -mr-3 font-medium"
+                            onClick={() => toggleSort('balance')}
+                          >
+                            Balance
+                            <ArrowUpDown className="h-3 w-3" />
+                          </Button>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedKnightsWallets.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            No Knights wallets found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        sortedKnightsWallets.map((wallet, index) => (
+                          <TableRow key={wallet.id}>
+                            <TableCell className="font-medium">{index + 1}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">
+                                {wallet.display_name || wallet.name || '-'}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {wallet.wallet_id ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    {`${wallet.wallet_id.substring(0, 8)}...${wallet.wallet_id.slice(-6)}`}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => copyWalletId(wallet.wallet_id!)}
+                                  >
+                                    {copiedId === wallet.wallet_id ? (
+                                      <Check className="h-3 w-3 text-success" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* All Wallets Tab */}
+            <TabsContent value="allwallets">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Balance overview for Wallet and main Wallet types
+                </p>
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground">Total: </span>
+                  <span className="font-bold text-lg text-primary">
+                    {allWalletsTotalBalance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                  </span>
+                </div>
               </div>
 
               {walletsLoading ? (
@@ -876,18 +1000,16 @@ const LandingPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedWallets.length === 0 ? (
+                      {sortedAllWallets.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                             No wallets found
                           </TableCell>
                         </TableRow>
                       ) : (
-                        sortedWallets.map((wallet, index) => (
+                        sortedAllWallets.map((wallet, index) => (
                           <TableRow key={wallet.id}>
-                            <TableCell className="font-medium">
-                              {index + 1}
-                            </TableCell>
+                            <TableCell className="font-medium">{index + 1}</TableCell>
                             <TableCell>
                               <div className="font-medium">
                                 {wallet.display_name || wallet.name || '-'}
