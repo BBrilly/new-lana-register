@@ -1,4 +1,4 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,6 +19,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -38,6 +39,12 @@ const LandingPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalBlocks, setTotalBlocks] = useState(0);
   const BLOCKS_PER_PAGE = 50;
+  
+  // Unregistered Lanas state
+  const [unregisteredEvents, setUnregisteredEvents] = useState<any[]>([]);
+  const [unregisteredPage, setUnregisteredPage] = useState(1);
+  const [totalUnregistered, setTotalUnregistered] = useState(0);
+  const EVENTS_PER_PAGE = 50;
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -161,10 +168,104 @@ const LandingPage = () => {
     loadBlockchainData();
   }, [currentPage]);
 
+  // Load unregistered lana events
+  useEffect(() => {
+    const loadUnregisteredEvents = async () => {
+      try {
+        // Get total count
+        const { count } = await supabase
+          .from('unregistered_lana_events')
+          .select('*', { count: 'exact', head: true });
+        
+        setTotalUnregistered(count || 0);
+
+        // Fetch events with wallet info
+        const from = (unregisteredPage - 1) * EVENTS_PER_PAGE;
+        const to = from + EVENTS_PER_PAGE - 1;
+        
+        const { data: events } = await supabase
+          .from('unregistered_lana_events')
+          .select(`
+            id,
+            wallet_id,
+            unregistered_amount,
+            detected_at,
+            notes,
+            return_wallet_id,
+            return_amount_unregistered_lana
+          `)
+          .order('detected_at', { ascending: false })
+          .range(from, to);
+
+        if (events) {
+          // Fetch wallet info for each event
+          const walletIds = [...new Set(events.map(e => e.wallet_id))];
+          
+          // Get wallets with main_wallet info
+          const { data: wallets } = await supabase
+            .from('wallets')
+            .select(`
+              id,
+              wallet_id,
+              main_wallet:main_wallets(name, display_name)
+            `)
+            .in('id', walletIds);
+
+          const walletMap = new Map(wallets?.map(w => [w.id, w]) || []);
+
+          const formattedEvents = events.map(event => {
+            const wallet = walletMap.get(event.wallet_id);
+            return {
+              ...event,
+              wallet_address: wallet?.wallet_id || null,
+              wallet_name: (wallet?.main_wallet as any)?.name || null,
+              wallet_display_name: (wallet?.main_wallet as any)?.display_name || null,
+            };
+          });
+
+          setUnregisteredEvents(formattedEvents);
+        }
+      } catch (error) {
+        console.error('Error loading unregistered events:', error);
+      }
+    };
+
+    loadUnregisteredEvents();
+  }, [unregisteredPage]);
+
   const connectedRelays = relayStatuses.filter(r => r.connected).length;
   const totalRelays = relayStatuses.length;
   
   const totalPages = Math.ceil(totalBlocks / BLOCKS_PER_PAGE);
+  const totalUnregisteredPages = Math.ceil(totalUnregistered / EVENTS_PER_PAGE);
+  
+  const getUnregisteredPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 10;
+    
+    if (totalUnregisteredPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalUnregisteredPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (unregisteredPage <= 6) {
+        for (let i = 1; i <= 8; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalUnregisteredPages);
+      } else if (unregisteredPage >= totalUnregisteredPages - 5) {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = totalUnregisteredPages - 7; i <= totalUnregisteredPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = unregisteredPage - 2; i <= unregisteredPage + 2; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalUnregisteredPages);
+      }
+    }
+    return pages;
+  };
   
   const getPageNumbers = () => {
     const pages = [];
@@ -334,120 +435,256 @@ const LandingPage = () => {
           </Card>
         </div>
 
-        {/* Audited Blocks Table */}
+        {/* Tabs Section */}
         <Card className="p-6">
-          <div className="mb-6 flex items-center gap-2">
-            <Database className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold text-foreground">Audited Blocks</h2>
-          </div>
-          <p className="mb-6 text-sm text-muted-foreground">
-            Recent blockchain blocks audited for registered wallet transactions
-          </p>
+          <Tabs defaultValue="blocks" className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="blocks" className="gap-2">
+                <Database className="h-4 w-4" />
+                Audited Blocks
+              </TabsTrigger>
+              <TabsTrigger value="unregistered" className="gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Unregistered Lanas ({totalUnregistered})
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Block ID</TableHead>
-                  <TableHead>Staked Time</TableHead>
-                  <TableHead>Audit Time</TableHead>
-                  <TableHead className="text-right">Total TX</TableHead>
-                  <TableHead className="text-right">Registered TX</TableHead>
-                  <TableHead className="text-right">Coverage</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentBlocks.map((block) => (
-                  <TableRow 
-                    key={block.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => {
-                      setSelectedBlock(block);
-                      setShowBlockDialog(true);
-                    }}
-                  >
-                    <TableCell className="font-mono font-medium">{block.id}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm">{block.stakedTime}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{block.auditTime}</TableCell>
-                    <TableCell className="text-right">{block.totalTx}</TableCell>
-                    <TableCell className="text-right">{block.registeredTx}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="h-2 w-24 overflow-hidden rounded-full bg-secondary">
-                          <div
-                            className="h-full bg-primary"
-                            style={{ width: `${block.coverage}%` }}
-                          />
-                        </div>
-                        <span className="text-sm">{block.coverage}%</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * BLOCKS_PER_PAGE) + 1} to {Math.min(currentPage * BLOCKS_PER_PAGE, totalBlocks)} of {totalBlocks} blocks
+            {/* Audited Blocks Tab */}
+            <TabsContent value="blocks">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Recent blockchain blocks audited for registered wallet transactions
+                </p>
               </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => {
-                        if (currentPage > 1) {
-                          setCurrentPage(p => p - 1);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
-                  {getPageNumbers().map((page, idx) => (
-                    page === 'ellipsis' ? (
-                      <PaginationItem key={`ellipsis-${idx}`}>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    ) : (
-                      <PaginationItem key={page}>
-                        <PaginationLink
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Block ID</TableHead>
+                      <TableHead>Staked Time</TableHead>
+                      <TableHead>Audit Time</TableHead>
+                      <TableHead className="text-right">Total TX</TableHead>
+                      <TableHead className="text-right">Registered TX</TableHead>
+                      <TableHead className="text-right">Coverage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentBlocks.map((block) => (
+                      <TableRow 
+                        key={block.id}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          setSelectedBlock(block);
+                          setShowBlockDialog(true);
+                        }}
+                      >
+                        <TableCell className="font-mono font-medium">{block.id}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm">{block.stakedTime}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{block.auditTime}</TableCell>
+                        <TableCell className="text-right">{block.totalTx}</TableCell>
+                        <TableCell className="text-right">{block.registeredTx}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="h-2 w-24 overflow-hidden rounded-full bg-secondary">
+                              <div
+                                className="h-full bg-primary"
+                                style={{ width: `${block.coverage}%` }}
+                              />
+                            </div>
+                            <span className="text-sm">{block.coverage}%</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {/* Blocks Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * BLOCKS_PER_PAGE) + 1} to {Math.min(currentPage * BLOCKS_PER_PAGE, totalBlocks)} of {totalBlocks} blocks
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
                           onClick={() => {
-                            setCurrentPage(page as number);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            if (currentPage > 1) {
+                              setCurrentPage(p => p - 1);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
                           }}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
-                        >
-                          {page}
-                        </PaginationLink>
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
                       </PaginationItem>
-                    )
-                  ))}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => {
-                        if (currentPage < totalPages) {
-                          setCurrentPage(p => p + 1);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+                      
+                      {getPageNumbers().map((page, idx) => (
+                        page === 'ellipsis' ? (
+                          <PaginationItem key={`ellipsis-${idx}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => {
+                                setCurrentPage(page as number);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      ))}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => {
+                            if (currentPage < totalPages) {
+                              setCurrentPage(p => p + 1);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                          }}
+                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Unregistered Lanas Tab */}
+            <TabsContent value="unregistered">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Transactions from unregistered wallets to registered wallets
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Recipient Wallet</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Detected</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unregisteredEvents.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No unregistered Lana events found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      unregisteredEvents.map((event, index) => (
+                        <TableRow key={event.id}>
+                          <TableCell className="font-medium">
+                            {((unregisteredPage - 1) * EVENTS_PER_PAGE) + index + 1}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              {(event.wallet_display_name || event.wallet_name) && (
+                                <div className="font-medium text-sm">
+                                  {event.wallet_display_name || event.wallet_name}
+                                </div>
+                              )}
+                              {event.wallet_address && (
+                                <div className="font-mono text-xs text-muted-foreground">
+                                  {`${event.wallet_address.substring(0, 8)}...${event.wallet_address.slice(-6)}`}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {Number(event.unregistered_amount).toFixed(4)} LANA
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {event.detected_at 
+                              ? formatDistanceToNow(new Date(event.detected_at), { addSuffix: true })
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                            {event.notes || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {/* Unregistered Pagination */}
+              {totalUnregisteredPages > 1 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((unregisteredPage - 1) * EVENTS_PER_PAGE) + 1} to {Math.min(unregisteredPage * EVENTS_PER_PAGE, totalUnregistered)} of {totalUnregistered} events
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => {
+                            if (unregisteredPage > 1) {
+                              setUnregisteredPage(p => p - 1);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                          }}
+                          className={unregisteredPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      
+                      {getUnregisteredPageNumbers().map((page, idx) => (
+                        page === 'ellipsis' ? (
+                          <PaginationItem key={`ellipsis-${idx}`}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => {
+                                setUnregisteredPage(page as number);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              isActive={unregisteredPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      ))}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => {
+                            if (unregisteredPage < totalUnregisteredPages) {
+                              setUnregisteredPage(p => p + 1);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                          }}
+                          className={unregisteredPage === totalUnregisteredPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </Card>
       </div>
 
