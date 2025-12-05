@@ -265,7 +265,7 @@ const LandingPage = () => {
             wallet_type,
             main_wallet:main_wallets(name, display_name)
           `)
-          .in('wallet_type', ['Wallets', 'main Wallet', 'Knights']);
+          .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights']);
 
         if (!wallets || wallets.length === 0) {
           setWalletBalances([]);
@@ -350,7 +350,7 @@ const LandingPage = () => {
   }, [walletBalances]);
 
   const allWallets = useMemo(() => {
-    return walletBalances.filter(w => w.wallet_type === 'Wallet' || w.wallet_type === 'main Wallet');
+    return walletBalances.filter(w => w.wallet_type === 'Wallet' || w.wallet_type === 'Main Wallet');
   }, [walletBalances]);
 
   const sortWallets = (wallets: WalletWithBalance[]) => {
@@ -953,7 +953,7 @@ const LandingPage = () => {
             <TabsContent value="allwallets">
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Balance overview for Wallet and main Wallet types
+                  Balance overview for Wallet and Main Wallet types
                 </p>
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total: </span>
