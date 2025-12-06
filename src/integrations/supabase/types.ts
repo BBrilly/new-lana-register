@@ -306,6 +306,9 @@ export type Database = {
         Row: {
           detected_at: string | null
           id: string
+          nostr_87003_event_id: string | null
+          nostr_87003_published: boolean | null
+          nostr_87003_published_at: string | null
           nostr_event_id: string | null
           notes: string | null
           return_amount_unregistered_lana: number | null
@@ -318,6 +321,9 @@ export type Database = {
         Insert: {
           detected_at?: string | null
           id?: string
+          nostr_87003_event_id?: string | null
+          nostr_87003_published?: boolean | null
+          nostr_87003_published_at?: string | null
           nostr_event_id?: string | null
           notes?: string | null
           return_amount_unregistered_lana?: number | null
@@ -330,6 +336,9 @@ export type Database = {
         Update: {
           detected_at?: string | null
           id?: string
+          nostr_87003_event_id?: string | null
+          nostr_87003_published?: boolean | null
+          nostr_87003_published_at?: string | null
           nostr_event_id?: string | null
           notes?: string | null
           return_amount_unregistered_lana?: number | null
