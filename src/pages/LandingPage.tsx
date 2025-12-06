@@ -956,7 +956,7 @@ const LandingPage = () => {
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total: </span>
                   <span className="font-bold text-lg text-primary">
-                    {knightsTotalBalance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                    {knightsTotalBalance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                   </span>
                 </div>
               </div>
@@ -1036,7 +1036,7 @@ const LandingPage = () => {
                               )}
                             </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                              {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                             </TableCell>
                           </TableRow>
                         ))
@@ -1056,7 +1056,7 @@ const LandingPage = () => {
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total: </span>
                   <span className="font-bold text-lg text-primary">
-                    {allWalletsTotalBalance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                    {allWalletsTotalBalance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                   </span>
                 </div>
               </div>
@@ -1142,7 +1142,7 @@ const LandingPage = () => {
                               )}
                             </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                              {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                             </TableCell>
                           </TableRow>
                         ))
@@ -1162,7 +1162,7 @@ const LandingPage = () => {
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total: </span>
                   <span className="font-bold text-lg text-primary">
-                    {lana8WonderTotalBalance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                    {lana8WonderTotalBalance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                   </span>
                 </div>
               </div>
@@ -1258,7 +1258,7 @@ const LandingPage = () => {
                               )}
                             </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                              {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                             </TableCell>
                           </TableRow>
                         ))
@@ -1279,7 +1279,7 @@ const LandingPage = () => {
                   <div className="text-right">
                     <span className="text-sm text-muted-foreground mr-2">Total v Splitu:</span>
                     <span className="font-bold text-primary text-lg">
-                      {registeredEvents.reduce((sum, event) => sum + Number(event.amount), 0).toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                      {registeredEvents.reduce((sum, event) => sum + Number(event.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                     </span>
                   </div>
                   <Badge variant="outline" className="text-sm">
@@ -1331,7 +1331,7 @@ const LandingPage = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-semibold text-primary">
-                              {Number(event.amount).toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                              {Number(event.amount).toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary">{event.split}</Badge>
