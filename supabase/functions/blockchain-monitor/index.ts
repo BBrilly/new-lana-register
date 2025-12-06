@@ -45,6 +45,17 @@ Deno.serve(async (req) => {
     const rpcUrl = `http://${RPC_HOST}:${RPC_PORT}/`;
     console.log(`Using RPC node: ${rpcNodes.name} (${RPC_HOST}:${RPC_PORT})`);
 
+    // Get current split value from system_parameters
+    const { data: systemParams } = await supabase
+      .from('system_parameters')
+      .select('split')
+      .order('fetched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const currentSplit = systemParams?.split ? parseInt(systemParams.split, 10) : 0;
+    console.log(`Current split value: ${currentSplit}`);
+
     // Enhanced RPC call function with retry logic
     async function rpcCall(method: string, params: any[] = [], retryCount = 0): Promise<any> {
       const payload = {
@@ -127,16 +138,20 @@ Deno.serve(async (req) => {
     const blocksThisRun = blocksToProcess.slice(0, MAX_BLOCKS_PER_RUN);
     console.log(`Processing ${blocksThisRun.length} blocks this run: [${blocksThisRun.join(', ')}]`);
 
-    // Get all registered wallet addresses once for efficiency
+    // Get all registered wallet addresses with wallet_type for efficiency
     const { data: registeredWallets } = await supabase
       .from('wallets')
-      .select('wallet_id, id');
+      .select('wallet_id, id, wallet_type');
 
     const walletAddresses = new Set(registeredWallets?.map(w => w.wallet_id) || []);
-    const walletMap = new Map(registeredWallets?.map(w => [w.wallet_id, w]) || []);
+    const walletMap = new Map(registeredWallets?.map(w => [w.wallet_id, {
+      id: w.id,
+      wallet_type: w.wallet_type
+    }]) || []);
 
     let totalTransactionsProcessed = 0;
     let totalRegisteredTransactions = 0;
+    let totalKnightsTransactions = 0;
     let successfulBlocks = 0;
     let failedBlocks: number[] = [];
 
@@ -219,6 +234,20 @@ Deno.serve(async (req) => {
                         block_id: blockHeight,
                         notes: `Blockchain transaction ${txid}`
                       });
+
+                      // Check if receiver is a Knights wallet - record to registered_lana_events
+                      if (receiverWallet?.wallet_type === 'Knights') {
+                        await supabase.from('registered_lana_events').insert({
+                          wallet_id: receiverWallet.id,
+                          amount: receiver.amount,
+                          notes: `Knights wallet received from ${senderAddr} (TX: ${txid})`,
+                          split: currentSplit,
+                          block_id: blockHeight,
+                          transaction_id: txid
+                        });
+                        totalKnightsTransactions++;
+                        console.log(`🏰 Knights wallet received ${receiver.amount} LANA from registered wallet`);
+                      }
                     } else {
                       // Only sender is registered
                       const senderWallet = walletMap.get(senderAddr);
@@ -245,6 +274,20 @@ Deno.serve(async (req) => {
                         block_id: blockHeight,
                         notes: `Incoming blockchain transaction ${txid} from ${Array.from(senders).join(', ')}`
                       });
+
+                      // Check if receiver is a Knights wallet - record to registered_lana_events
+                      if (receiverWallet?.wallet_type === 'Knights') {
+                        await supabase.from('registered_lana_events').insert({
+                          wallet_id: receiverWallet.id,
+                          amount: receiver.amount,
+                          notes: `Knights wallet received from ${Array.from(senders).join(', ')} (TX: ${txid})`,
+                          split: currentSplit,
+                          block_id: blockHeight,
+                          transaction_id: txid
+                        });
+                        totalKnightsTransactions++;
+                        console.log(`🏰 Knights wallet received ${receiver.amount} LANA from unregistered sender`);
+                      }
                     }
                   }
                 }
@@ -288,15 +331,21 @@ Deno.serve(async (req) => {
       failedBlocks,
       totalTransactionsProcessed,
       totalRegisteredTransactions,
+      totalKnightsTransactions,
       currentHeight,
       lastProcessedHeight,
       remainingBlocks,
       nextBlocksToProcess: remainingBlocks > 0 ? blocksToProcess.slice(MAX_BLOCKS_PER_RUN, MAX_BLOCKS_PER_RUN + 5) : [],
       gapDetected: blocksToProcess.length > 1,
-      blocksProcessedThisRun: blocksThisRun
+      blocksProcessedThisRun: blocksThisRun,
+      currentSplit
     };
 
     console.log(`🎯 Batch completed: ${successfulBlocks}/${blocksThisRun.length} blocks processed successfully`);
+    
+    if (totalKnightsTransactions > 0) {
+      console.log(`🏰 Knights transactions recorded: ${totalKnightsTransactions}`);
+    }
     
     if (remainingBlocks > 0) {
       console.log(`⏳ ${remainingBlocks} blocks remaining for next run`);

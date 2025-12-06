@@ -101,6 +101,42 @@ export type Database = {
         }
         Relationships: []
       }
+      registered_lana_events: {
+        Row: {
+          amount: number
+          block_id: number | null
+          created_at: string | null
+          detected_at: string | null
+          id: string
+          notes: string | null
+          split: number
+          transaction_id: string | null
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          block_id?: number | null
+          created_at?: string | null
+          detected_at?: string | null
+          id?: string
+          notes?: string | null
+          split: number
+          transaction_id?: string | null
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          block_id?: number | null
+          created_at?: string | null
+          detected_at?: string | null
+          id?: string
+          notes?: string | null
+          split?: number
+          transaction_id?: string | null
+          wallet_id?: string
+        }
+        Relationships: []
+      }
       rpc_nodes: {
         Row: {
           created_at: string
