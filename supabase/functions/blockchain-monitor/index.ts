@@ -266,17 +266,17 @@ Deno.serve(async (req) => {
 
                       // Pošiljatelj je NEREGISTRIRAN - preveri če je prejemnik Knights wallet
                       if (receiverWallet?.wallet_type === 'Knights') {
-                        // Zapiši NEREGISTRIRANO LANO v registered_lana_events za Knights wallet
+                        // Insert UNREGISTERED LANA to registered_lana_events for Knights wallet
                         await supabase.from('registered_lana_events').insert({
                           wallet_id: receiverWallet.id,
                           amount: receiver.amount,
-                          notes: `NEREGISTRIRANA LANA na Knights wallet od ${Array.from(senders).join(', ')} (TX: ${txid})`,
+                          notes: `UNREGISTERED LANA to Knights wallet from ${Array.from(senders).join(', ')} (TX: ${txid})`,
                           split: currentSplit,
                           block_id: blockHeight,
                           transaction_id: txid
                         });
                         totalKnightsTransactions++;
-                        console.log(`🏰 Knights wallet prejel ${receiver.amount} NEREGISTRIRANE LANA od neregistriranega pošiljatelja`);
+                        console.log(`🏰 Knights wallet received ${receiver.amount} UNREGISTERED LANA from unregistered sender`);
                       }
                     }
                   }
