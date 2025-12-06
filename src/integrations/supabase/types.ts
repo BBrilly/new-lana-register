@@ -35,6 +35,33 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       block_tx: {
         Row: {
           all_block_transactions: number
@@ -108,6 +135,9 @@ export type Database = {
           created_at: string | null
           detected_at: string | null
           id: string
+          nostr_87005_event_id: string | null
+          nostr_87005_published: boolean | null
+          nostr_87005_published_at: string | null
           notes: string | null
           split: number
           transaction_id: string | null
@@ -119,6 +149,9 @@ export type Database = {
           created_at?: string | null
           detected_at?: string | null
           id?: string
+          nostr_87005_event_id?: string | null
+          nostr_87005_published?: boolean | null
+          nostr_87005_published_at?: string | null
           notes?: string | null
           split: number
           transaction_id?: string | null
@@ -130,6 +163,9 @@ export type Database = {
           created_at?: string | null
           detected_at?: string | null
           id?: string
+          nostr_87005_event_id?: string | null
+          nostr_87005_published?: boolean | null
+          nostr_87005_published_at?: string | null
           notes?: string | null
           split?: number
           transaction_id?: string | null
