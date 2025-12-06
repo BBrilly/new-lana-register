@@ -1271,11 +1271,17 @@ const LandingPage = () => {
 
             {/* Registered Knights Transactions Tab */}
             <TabsContent value="registered">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex items-center justify-between flex-wrap gap-4">
                 <p className="text-sm text-muted-foreground">
                   Knights wallet transactions for current split period
                 </p>
-                <div className="text-right">
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <span className="text-sm text-muted-foreground mr-2">Total v Splitu:</span>
+                    <span className="font-bold text-primary text-lg">
+                      {registeredEvents.reduce((sum, event) => sum + Number(event.amount), 0).toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                    </span>
+                  </div>
                   <Badge variant="outline" className="text-sm">
                     Current Split: {currentSplit !== null ? currentSplit : 'Loading...'}
                   </Badge>
