@@ -18,5 +18,5 @@ verify_jwt = false
 [functions.kind-87005-new-lana-registration]
 verify_jwt = false
 
-[functions."Kind CRON 87003 – Monitoring for Unregistered Coins"]
+[functions.kind-cron-87003-monitoring-unregistered-coins]
 verify_jwt = false
