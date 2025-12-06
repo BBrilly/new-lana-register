@@ -235,19 +235,8 @@ Deno.serve(async (req) => {
                         notes: `Blockchain transaction ${txid}`
                       });
 
-                      // Check if receiver is a Knights wallet - record to registered_lana_events
-                      if (receiverWallet?.wallet_type === 'Knights') {
-                        await supabase.from('registered_lana_events').insert({
-                          wallet_id: receiverWallet.id,
-                          amount: receiver.amount,
-                          notes: `Knights wallet received from ${senderAddr} (TX: ${txid})`,
-                          split: currentSplit,
-                          block_id: blockHeight,
-                          transaction_id: txid
-                        });
-                        totalKnightsTransactions++;
-                        console.log(`🏰 Knights wallet received ${receiver.amount} LANA from registered wallet`);
-                      }
+                      // Oba sta registrirana - normalna interna transakcija
+                      // NE zapisuj v registered_lana_events (samo neregistrirane transakcije gredo tja)
                     } else {
                       // Only sender is registered
                       const senderWallet = walletMap.get(senderAddr);
@@ -275,18 +264,19 @@ Deno.serve(async (req) => {
                         notes: `Incoming blockchain transaction ${txid} from ${Array.from(senders).join(', ')}`
                       });
 
-                      // Check if receiver is a Knights wallet - record to registered_lana_events
+                      // Pošiljatelj je NEREGISTRIRAN - preveri če je prejemnik Knights wallet
                       if (receiverWallet?.wallet_type === 'Knights') {
+                        // Zapiši NEREGISTRIRANO LANO v registered_lana_events za Knights wallet
                         await supabase.from('registered_lana_events').insert({
                           wallet_id: receiverWallet.id,
                           amount: receiver.amount,
-                          notes: `Knights wallet received from ${Array.from(senders).join(', ')} (TX: ${txid})`,
+                          notes: `NEREGISTRIRANA LANA na Knights wallet od ${Array.from(senders).join(', ')} (TX: ${txid})`,
                           split: currentSplit,
                           block_id: blockHeight,
                           transaction_id: txid
                         });
                         totalKnightsTransactions++;
-                        console.log(`🏰 Knights wallet received ${receiver.amount} LANA from unregistered sender`);
+                        console.log(`🏰 Knights wallet prejel ${receiver.amount} NEREGISTRIRANE LANA od neregistriranega pošiljatelja`);
                       }
                     }
                   }
