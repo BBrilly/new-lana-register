@@ -56,6 +56,11 @@ const LandingPage = () => {
   const [totalUnregistered, setTotalUnregistered] = useState(0);
   const EVENTS_PER_PAGE = 50;
 
+  // Registered Lana Events (Knights transactions) state
+  const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
+  const [registeredEventsLoading, setRegisteredEventsLoading] = useState(false);
+  const [currentSplit, setCurrentSplit] = useState<number | null>(null);
+
   // Wallet balances state
   const [walletBalances, setWalletBalances] = useState<WalletWithBalance[]>([]);
   const [walletsLoading, setWalletsLoading] = useState(false);
@@ -344,6 +349,83 @@ const LandingPage = () => {
     loadWalletBalances();
   }, []);
 
+  // Load registered lana events (Knights transactions) for current split
+  useEffect(() => {
+    const loadRegisteredEvents = async () => {
+      try {
+        setRegisteredEventsLoading(true);
+
+        // Get current split value from system_parameters
+        const { data: sysParams } = await supabase
+          .from('system_parameters')
+          .select('split')
+          .order('fetched_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const splitValue = sysParams?.split ? parseInt(sysParams.split, 10) : null;
+        setCurrentSplit(splitValue);
+
+        if (splitValue === null) {
+          setRegisteredEvents([]);
+          return;
+        }
+
+        // Fetch registered_lana_events for current split
+        const { data: events } = await supabase
+          .from('registered_lana_events')
+          .select(`
+            id,
+            wallet_id,
+            amount,
+            notes,
+            detected_at,
+            split,
+            block_id,
+            transaction_id
+          `)
+          .eq('split', splitValue)
+          .order('detected_at', { ascending: false });
+
+        if (events && events.length > 0) {
+          // Get wallet info
+          const walletIds = [...new Set(events.map(e => e.wallet_id))];
+          
+          const { data: wallets } = await supabase
+            .from('wallets')
+            .select(`
+              id,
+              wallet_id,
+              main_wallet:main_wallets(name, display_name)
+            `)
+            .in('id', walletIds);
+
+          const walletMap = new Map(wallets?.map(w => [w.id, w]) || []);
+
+          const formattedEvents = events.map(event => {
+            const wallet = walletMap.get(event.wallet_id);
+            return {
+              ...event,
+              wallet_address: wallet?.wallet_id || null,
+              wallet_name: (wallet?.main_wallet as any)?.name || null,
+              wallet_display_name: (wallet?.main_wallet as any)?.display_name || null,
+            };
+          });
+
+          setRegisteredEvents(formattedEvents);
+        } else {
+          setRegisteredEvents([]);
+        }
+      } catch (error) {
+        console.error('Error loading registered events:', error);
+      } finally {
+        setRegisteredEventsLoading(false);
+      }
+    };
+
+    loadRegisteredEvents();
+  }, []);
+
   // Filter and sort wallets for different tabs
   const knightsWallets = useMemo(() => {
     return walletBalances.filter(w => w.wallet_type === 'Knights');
@@ -622,6 +704,10 @@ const LandingPage = () => {
               <TabsTrigger value="lana8wonder" className="gap-2">
                 <Coins className="h-4 w-4" />
                 Lana8Wonder ({lana8WonderWallets.length})
+              </TabsTrigger>
+              <TabsTrigger value="registered" className="gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Knights TX ({registeredEvents.length})
               </TabsTrigger>
             </TabsList>
 
@@ -1173,6 +1259,84 @@ const LandingPage = () => {
                             </TableCell>
                             <TableCell className="text-right font-semibold">
                               {wallet.balance.toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Registered Knights Transactions Tab */}
+            <TabsContent value="registered">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Knights wallet transactions for current split period
+                </p>
+                <div className="text-right">
+                  <Badge variant="outline" className="text-sm">
+                    Current Split: {currentSplit !== null ? currentSplit : 'Loading...'}
+                  </Badge>
+                </div>
+              </div>
+
+              {registeredEventsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Wallet Owner</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-center">Split</TableHead>
+                        <TableHead>Detected</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {registeredEvents.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No Knights transactions found for current split ({currentSplit})
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        registeredEvents.map((event, index) => (
+                          <TableRow key={event.id}>
+                            <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                {(event.wallet_display_name || event.wallet_name) && (
+                                  <div className="font-medium text-sm">
+                                    {event.wallet_display_name || event.wallet_name}
+                                  </div>
+                                )}
+                                {event.wallet_address && (
+                                  <div className="font-mono text-xs text-muted-foreground">
+                                    {`${event.wallet_address.substring(0, 8)}...${event.wallet_address.slice(-6)}`}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-primary">
+                              {Number(event.amount).toLocaleString('en-US', { maximumFractionDigits: 8 })} LANA
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary">{event.split}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {event.detected_at
+                                ? formatDistanceToNow(new Date(event.detected_at), { addSuffix: true })
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                              {event.notes || '-'}
                             </TableCell>
                           </TableRow>
                         ))
