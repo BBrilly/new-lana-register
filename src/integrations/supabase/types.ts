@@ -92,6 +92,42 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_wallets: {
+        Row: {
+          created_at: string
+          deleted_at: string
+          id: string
+          main_wallet_id: string | null
+          nostr_hex_id: string
+          original_wallet_uuid: string | null
+          reason: string
+          wallet_id: string | null
+          wallet_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string
+          id?: string
+          main_wallet_id?: string | null
+          nostr_hex_id: string
+          original_wallet_uuid?: string | null
+          reason: string
+          wallet_id?: string | null
+          wallet_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string
+          id?: string
+          main_wallet_id?: string | null
+          nostr_hex_id?: string
+          original_wallet_uuid?: string | null
+          reason?: string
+          wallet_id?: string | null
+          wallet_type?: string | null
+        }
+        Relationships: []
+      }
       main_wallets: {
         Row: {
           created_at: string

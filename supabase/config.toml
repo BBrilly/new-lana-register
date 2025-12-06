@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.kind-cron-87003-monitoring-unregistered-coins]
 verify_jwt = false
+
+[functions.kind-cron-37772-lanaknight-registry]
+verify_jwt = false
