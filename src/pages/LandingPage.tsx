@@ -682,9 +682,9 @@ const LandingPage = () => {
         </div>
 
         {/* Tabs Section */}
-        <Card className="p-6">
+        <Card className="p-6 overflow-hidden">
           <Tabs defaultValue="blocks" className="w-full">
-            <TabsList className="mb-6">
+            <TabsList className="mb-6 flex-wrap h-auto gap-1">
               <TabsTrigger value="blocks" className="gap-2">
                 <Database className="h-4 w-4" />
                 Audited Blocks
