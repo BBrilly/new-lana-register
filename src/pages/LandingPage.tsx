@@ -1,4 +1,4 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-
+import { useAllNostrEvents, latoshisToLana, clearAllNostrEventsCache, CombinedEvent } from "@/hooks/useAllNostrEvents";
 interface WalletWithBalance {
   id: string;
   wallet_id: string | null;
@@ -50,10 +50,9 @@ const LandingPage = () => {
   const [totalBlocks, setTotalBlocks] = useState(0);
   const BLOCKS_PER_PAGE = 50;
   
-  // Unregistered Lanas state
-  const [unregisteredEvents, setUnregisteredEvents] = useState<any[]>([]);
+  // Unregistered Lanas from Nostr relays
+  const { events: nostrEvents, isLoading: nostrEventsLoading, error: nostrEventsError } = useAllNostrEvents();
   const [unregisteredPage, setUnregisteredPage] = useState(1);
-  const [totalUnregistered, setTotalUnregistered] = useState(0);
   const EVENTS_PER_PAGE = 50;
 
   // Registered Lana Events (Knights transactions) state
@@ -195,70 +194,20 @@ const LandingPage = () => {
     loadBlockchainData();
   }, [currentPage]);
 
-  // Load unregistered lana events
-  useEffect(() => {
-    const loadUnregisteredEvents = async () => {
-      try {
-        // Get total count
-        const { count } = await supabase
-          .from('unregistered_lana_events')
-          .select('*', { count: 'exact', head: true });
-        
-        setTotalUnregistered(count || 0);
+  // Paginate nostr events
+  const paginatedNostrEvents = useMemo(() => {
+    const from = (unregisteredPage - 1) * EVENTS_PER_PAGE;
+    const to = from + EVENTS_PER_PAGE;
+    return nostrEvents.slice(from, to);
+  }, [nostrEvents, unregisteredPage]);
 
-        // Fetch events with wallet info
-        const from = (unregisteredPage - 1) * EVENTS_PER_PAGE;
-        const to = from + EVENTS_PER_PAGE - 1;
-        
-        const { data: events } = await supabase
-          .from('unregistered_lana_events')
-          .select(`
-            id,
-            wallet_id,
-            unregistered_amount,
-            detected_at,
-            notes,
-            return_wallet_id,
-            return_amount_unregistered_lana
-          `)
-          .order('detected_at', { ascending: false })
-          .range(from, to);
+  const totalUnregistered = nostrEvents.length;
+  const totalUnregisteredPages = Math.ceil(totalUnregistered / EVENTS_PER_PAGE);
 
-        if (events) {
-          // Fetch wallet info for each event
-          const walletIds = [...new Set(events.map(e => e.wallet_id))];
-          
-          // Get wallets with main_wallet info
-          const { data: wallets } = await supabase
-            .from('wallets')
-            .select(`
-              id,
-              wallet_id,
-              main_wallet:main_wallets(name, display_name)
-            `)
-            .in('id', walletIds);
-
-          const walletMap = new Map(wallets?.map(w => [w.id, w]) || []);
-
-          const formattedEvents = events.map(event => {
-            const wallet = walletMap.get(event.wallet_id);
-            return {
-              ...event,
-              wallet_address: wallet?.wallet_id || null,
-              wallet_name: (wallet?.main_wallet as any)?.name || null,
-              wallet_display_name: (wallet?.main_wallet as any)?.display_name || null,
-            };
-          });
-
-          setUnregisteredEvents(formattedEvents);
-        }
-      } catch (error) {
-        console.error('Error loading unregistered events:', error);
-      }
-    };
-
-    loadUnregisteredEvents();
-  }, [unregisteredPage]);
+  const handleRefreshNostrEvents = () => {
+    clearAllNostrEventsCache();
+    window.location.reload();
+  };
 
   // Load wallet balances for the third tab
   useEffect(() => {
@@ -493,7 +442,6 @@ const LandingPage = () => {
   const totalRelays = relayStatuses.length;
   
   const totalPages = Math.ceil(totalBlocks / BLOCKS_PER_PAGE);
-  const totalUnregisteredPages = Math.ceil(totalUnregistered / EVENTS_PER_PAGE);
   
   const getUnregisteredPageNumbers = () => {
     const pages = [];
@@ -848,67 +796,88 @@ const LandingPage = () => {
 
             {/* Unregistered Lanas Tab */}
             <TabsContent value="unregistered">
-              <div className="mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Transactions from unregistered wallets to registered wallets
+                  Unregistered Lana events from Nostr relays (Kind 87003)
                 </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefreshNostrEvents}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
               </div>
 
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>#</TableHead>
-                      <TableHead>Recipient Wallet</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Detected</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {unregisteredEvents.length === 0 ? (
+              {nostrEventsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : nostrEventsError ? (
+                <div className="text-center text-destructive py-8">
+                  Error loading events: {nostrEventsError}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          No unregistered Lana events found
-                        </TableCell>
+                        <TableHead>#</TableHead>
+                        <TableHead>Wallet ID</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>TX ID</TableHead>
                       </TableRow>
-                    ) : (
-                      unregisteredEvents.map((event, index) => (
-                        <TableRow key={event.id}>
-                          <TableCell className="font-medium">
-                            {((unregisteredPage - 1) * EVENTS_PER_PAGE) + index + 1}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              {(event.wallet_display_name || event.wallet_name) && (
-                                <div className="font-medium text-sm">
-                                  {event.wallet_display_name || event.wallet_name}
-                                </div>
-                              )}
-                              {event.wallet_address && (
-                                <div className="font-mono text-xs text-muted-foreground">
-                                  {`${event.wallet_address.substring(0, 8)}...${event.wallet_address.slice(-6)}`}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {Number(event.unregistered_amount).toFixed(4)} LANA
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {event.detected_at 
-                              ? formatDistanceToNow(new Date(event.detected_at), { addSuffix: true })
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                            {event.notes || '-'}
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedNostrEvents.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No unregistered Lana events found from relays
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      ) : (
+                        paginatedNostrEvents.map((event, index) => (
+                          <TableRow key={event.id}>
+                            <TableCell className="font-medium">
+                              {((unregisteredPage - 1) * EVENTS_PER_PAGE) + index + 1}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-mono text-xs">
+                                {event.walletId ? `${event.walletId.substring(0, 8)}...${event.walletId.slice(-6)}` : '-'}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {latoshisToLana(event.unregisteredAmountLatoshis).toFixed(4)} LANA
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDistanceToNow(new Date(event.createdAt * 1000), { addSuffix: true })}
+                            </TableCell>
+                            <TableCell>
+                              {event.isReturned ? (
+                                <Badge variant="default" className="bg-green-500/20 text-green-600 border-green-500/30">
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Returned
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-yellow-600 border-yellow-500/30">
+                                  Pending
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              {event.txId ? `${event.txId.substring(0, 8)}...` : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
               
               {/* Unregistered Pagination */}
               {totalUnregisteredPages > 1 && (
