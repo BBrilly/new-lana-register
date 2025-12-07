@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Send, AlertTriangle, Wallet, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, AlertTriangle, Wallet, ArrowRight, Loader2, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { toast } from 'sonner';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const SendToRegister = () => {
   const [searchParams] = useSearchParams();
@@ -26,17 +27,28 @@ const SendToRegister = () => {
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   
-  // Fetch balance for the source wallet
-  const { balances, isLoading: isLoadingBalance } = useWalletBalances(walletUuid ? [walletUuid] : []);
-  const walletBalance = walletUuid ? balances.get(walletUuid) : undefined;
+  // Fetch balance using the wallet ADDRESS (not UUID)
+  const { balances, isLoading: isLoadingBalance } = useWalletBalances(fromWallet ? [fromWallet] : []);
+  const walletBalance = fromWallet ? balances.get(fromWallet) : undefined;
   
-  const amountLatoshis = parseInt(amount, 10);
-  const amountLana = amountLatoshis / 100000000;
+  const amountLanoshis = parseInt(amount, 10);
+  const amountLana = amountLanoshis / 100000000;
   const balanceLana = walletBalance ? walletBalance / 100000000 : 0;
   const fee = 0.0001; // Estimated fee in LAN
   const totalNeeded = amountLana + fee;
   const hasSufficientBalance = balanceLana >= totalNeeded;
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchRegisterWallet = async () => {
@@ -70,6 +82,75 @@ const SendToRegister = () => {
     fetchRegisterWallet();
   }, []);
 
+  const startScanning = async () => {
+    setIsScanning(true);
+    
+    setTimeout(async () => {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras || cameras.length === 0) {
+          toast.error('No camera found on this device');
+          setIsScanning(false);
+          return;
+        }
+
+        let selectedCamera = cameras[0];
+        if (cameras.length > 1) {
+          const backCamera = cameras.find(camera => 
+            camera.label.toLowerCase().includes('back') || 
+            camera.label.toLowerCase().includes('rear')
+          );
+          if (backCamera) {
+            selectedCamera = backCamera;
+          }
+        }
+
+        const scanner = new Html5Qrcode("qr-reader-send");
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          selectedCamera.id,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          },
+          (decodedText) => {
+            setPrivateKey(decodedText);
+            stopScanning();
+            toast.success('QR code scanned - WIF key detected');
+          },
+          () => {}
+        );
+      } catch (error: any) {
+        console.error("Error starting QR scanner:", error);
+        setIsScanning(false);
+        
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          toast.error('Camera permission denied. Please allow camera access.');
+        } else if (error.name === "NotFoundError") {
+          toast.error('No camera found on this device');
+        } else if (error.name === "NotReadableError") {
+          toast.error('Camera is already in use by another application');
+        } else {
+          toast.error(`Error starting camera: ${error.message || "Unknown error"}`);
+        }
+      }
+    }, 100);
+  };
+
+  const stopScanning = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (error) {
+        console.error("Error stopping scanner:", error);
+      }
+    }
+    setIsScanning(false);
+  };
+
   const handleSend = async () => {
     if (!privateKey.trim()) {
       toast.error('Please enter your private key (WIF)');
@@ -85,7 +166,6 @@ const SendToRegister = () => {
     
     try {
       // TODO: Implement actual transaction sending
-      // This would call the consolidate-wallet edge function or similar
       toast.success('Transaction functionality coming soon');
     } catch (err) {
       console.error('Error sending transaction:', err);
@@ -130,7 +210,7 @@ const SendToRegister = () => {
                   })} LAN
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  ({amountLatoshis.toLocaleString()} latoshis)
+                  ({amountLanoshis.toLocaleString()} lanoshis)
                 </p>
               </div>
             </div>
@@ -212,8 +292,38 @@ const SendToRegister = () => {
                 placeholder="Enter your private key to sign the transaction"
                 value={privateKey}
                 onChange={(e) => setPrivateKey(e.target.value)}
+                disabled={isScanning}
                 className="font-mono"
               />
+              
+              {!isScanning ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={startScanning}
+                  disabled={isSending}
+                  className="w-full"
+                >
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Scan QR Code
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <div
+                    id="qr-reader-send"
+                    className="rounded-lg overflow-hidden border-2 border-primary"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={stopScanning}
+                    className="w-full"
+                  >
+                    Stop Scanning
+                  </Button>
+                </div>
+              )}
+              
               <p className="text-xs text-muted-foreground">
                 Your private key is used only to sign the transaction locally and is never sent to any server.
               </p>
@@ -230,7 +340,7 @@ const SendToRegister = () => {
             {/* Send Button */}
             <Button
               onClick={handleSend}
-              disabled={isSending || isLoadingSettings || !hasSufficientBalance || !privateKey.trim() || !!settingsError}
+              disabled={isSending || isLoadingSettings || !hasSufficientBalance || !privateKey.trim() || !!settingsError || isScanning}
               className="w-full"
               size="lg"
             >
