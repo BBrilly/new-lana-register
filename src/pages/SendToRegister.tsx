@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Send, AlertTriangle, Wallet, ArrowRight, Loader2, QrCode } from 'lucide-react';
+import { ArrowLeft, Send, AlertTriangle, Wallet, ArrowRight, Loader2, QrCode, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
-
+import { getAuthSession } from '@/utils/wifAuth';
+import { getStoredParameters, getStoredRelayStatuses } from '@/utils/nostrClient';
 const SendToRegister = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -161,15 +162,97 @@ const SendToRegister = () => {
       toast.error('Insufficient balance for this transaction');
       return;
     }
+
+    if (!registerWallet) {
+      toast.error('Register wallet not configured');
+      return;
+    }
     
     setIsSending(true);
     
     try {
-      // TODO: Implement actual transaction sending
-      toast.success('Transaction functionality coming soon');
+      // Get user session for pubkey
+      const authSession = getAuthSession();
+      if (!authSession) {
+        toast.error('User session not found. Please log in again.');
+        setIsSending(false);
+        return;
+      }
+      
+      // Get system parameters for electrum servers and relays
+      const sysParams = getStoredParameters();
+      const relayStatuses = getStoredRelayStatuses();
+      
+      // Get electrum servers
+      let electrumServers: { host: string; port: number }[] = [
+        { host: "electrum1.lanacoin.com", port: 5097 },
+        { host: "electrum2.lanacoin.com", port: 5097 }
+      ];
+      if (sysParams?.electrum && Array.isArray(sysParams.electrum)) {
+        electrumServers = (sysParams.electrum as any[]).map(e => ({ host: e.host, port: Number(e.port) }));
+      }
+      
+      // Get connected relays
+      let relays = relayStatuses
+        .filter(r => r.connected)
+        .map(r => r.url);
+      if (relays.length === 0 && sysParams?.relays) {
+        relays = sysParams.relays;
+      }
+      if (relays.length === 0) {
+        relays = ['wss://relay.lanavault.space', 'wss://relay.lanacoin-eternity.com'];
+      }
+      
+      toast.info('Building and broadcasting transaction...');
+      
+      const response = await supabase.functions.invoke('send-and-register-lana', {
+        body: {
+          sender_address: fromWallet,
+          recipients: [
+            { address: registerWallet, amount: amountLana }
+          ],
+          private_key: privateKey,
+          electrum_servers: electrumServers,
+          relays: relays,
+          user_pubkey_hex: authSession.nostrHexId,
+          original_event_id: eventId,
+          from_wallet: fromWallet,
+          to_wallet: registerWallet,
+          amount_lanoshis: amount,
+          memo: 'User regularized unregistered balance per 87003 notice.'
+        }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to send transaction');
+      }
+      
+      const result = response.data;
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Transaction failed');
+      }
+      
+      // Success!
+      toast.success(
+        <div className="space-y-1">
+          <p className="font-semibold">Transaction successful!</p>
+          <p className="text-sm">TX: {result.txid?.slice(0, 16)}...</p>
+          {result.nostr_event_published && (
+            <p className="text-sm text-green-600">Kind 87009 event published</p>
+          )}
+        </div>,
+        { duration: 10000 }
+      );
+      
+      // Navigate back after success
+      setTimeout(() => {
+        navigate(-1);
+      }, 2000);
+      
     } catch (err) {
       console.error('Error sending transaction:', err);
-      toast.error('Failed to send transaction');
+      toast.error(err instanceof Error ? err.message : 'Failed to send transaction');
     } finally {
       setIsSending(false);
     }

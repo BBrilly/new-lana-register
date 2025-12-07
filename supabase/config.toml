@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.kind-cron-37772-lanaknight-registry]
 verify_jwt = false
+
+[functions.send-and-register-lana]
+verify_jwt = false
+
+[functions.consolidate-wallet]
+verify_jwt = false
+
+[functions.analyze-wallet-utxos]
+verify_jwt = false
