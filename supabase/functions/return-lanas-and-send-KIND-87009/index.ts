@@ -705,7 +705,7 @@ serve(async (req) => {
   }
   
   try {
-    console.log('🚀 Starting LANA send-and-register transaction...');
+    console.log('🚀 Starting return-lanas-and-send-KIND-87009 transaction...');
     
     const {
       sender_address,
