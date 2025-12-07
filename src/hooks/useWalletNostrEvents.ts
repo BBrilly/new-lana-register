@@ -13,6 +13,11 @@ export interface Kind87003Event {
   createdAt: number;
 }
 
+// Cache for all Kind 87003 events to avoid fetching multiple times
+let cachedEvents: Kind87003Event[] | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION_MS = 60000; // 1 minute cache
+
 export const useWalletNostrEvents = (walletAddress: string | undefined) => {
   const [events, setEvents] = useState<Kind87003Event[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,6 +34,18 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
       setError(null);
 
       try {
+        const now = Date.now();
+        
+        // Check if we have valid cached events
+        if (cachedEvents && (now - cacheTimestamp) < CACHE_DURATION_MS) {
+          console.log(`📦 Using cached Kind 87003 events for wallet: ${walletAddress}`);
+          const walletEvents = cachedEvents.filter(e => e.walletId === walletAddress);
+          console.log(`📥 Found ${walletEvents.length} cached events for wallet ${walletAddress}`);
+          setEvents(walletEvents);
+          setIsLoading(false);
+          return;
+        }
+
         // Get relays from stored parameters
         const params = getStoredParameters();
         const relayStatuses = getStoredRelayStatuses();
@@ -47,24 +64,23 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
           ? connectedRelays 
           : (params?.relays || defaultRelays);
 
-        console.log(`🔍 Fetching Kind 87003 events for wallet: ${walletAddress}`);
-        console.log(`📡 Using ${relaysToUse.length} relays`);
+        console.log(`🔍 Fetching ALL Kind 87003 events from relays`);
+        console.log(`📡 Using ${relaysToUse.length} relays:`, relaysToUse);
 
         const pool = new SimplePool();
 
-        // Query for Kind 87003 events with WalletID tag matching this wallet
+        // Fetch ALL Kind 87003 events (without WalletID filter since some relays don't support it)
         const filter: Filter = {
           kinds: [87003],
-          '#WalletID': [walletAddress],
-          limit: 50
+          limit: 500
         };
 
         const fetchedEvents = await pool.querySync(relaysToUse, filter);
         
-        console.log(`📥 Found ${fetchedEvents.length} Kind 87003 events for wallet ${walletAddress}`);
+        console.log(`📥 Fetched ${fetchedEvents.length} total Kind 87003 events from relays`);
 
-        // Parse events
-        const parsedEvents: Kind87003Event[] = fetchedEvents.map((event: Event) => {
+        // Parse all events
+        const allParsedEvents: Kind87003Event[] = fetchedEvents.map((event: Event) => {
           const pTag = event.tags.find(t => t[0] === 'p');
           const walletIdTag = event.tags.find(t => t[0] === 'WalletID');
           const txTag = event.tags.find(t => t[0] === 'TX');
@@ -84,9 +100,17 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
         });
 
         // Sort by created_at descending
-        parsedEvents.sort((a, b) => b.createdAt - a.createdAt);
+        allParsedEvents.sort((a, b) => b.createdAt - a.createdAt);
 
-        setEvents(parsedEvents);
+        // Cache all events
+        cachedEvents = allParsedEvents;
+        cacheTimestamp = now;
+
+        // Filter for this specific wallet
+        const walletEvents = allParsedEvents.filter(e => e.walletId === walletAddress);
+        console.log(`📥 Found ${walletEvents.length} Kind 87003 events for wallet ${walletAddress}`);
+
+        setEvents(walletEvents);
         pool.close(relaysToUse);
       } catch (err) {
         console.error('Error fetching Nostr events:', err);
@@ -105,4 +129,10 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
 // Helper function to convert latoshis to LANA
 export const latoshisToLana = (latoshis: string): number => {
   return parseFloat(latoshis) / 100000000;
+};
+
+// Function to clear cache (useful for manual refresh)
+export const clearNostrEventsCache = () => {
+  cachedEvents = null;
+  cacheTimestamp = 0;
 };
