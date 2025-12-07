@@ -26,6 +26,20 @@ interface WalletInfo {
   id: string;
   wallet_id: string;
   main_wallet_id: string;
+  main_wallets: {
+    nostr_hex_id: string;
+    is_owned: boolean;
+  } | null;
+}
+
+interface WalletRow {
+  id: string;
+  wallet_id: string;
+  main_wallet_id: string;
+  main_wallets: {
+    nostr_hex_id: string;
+    is_owned: boolean;
+  } | { nostr_hex_id: string; is_owned: boolean; }[] | null;
 }
 
 // Convert nsec to hex private key
@@ -238,11 +252,11 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Found ${unpublishedEvents.length} unpublished unregistered events`);
 
-    // 4. Fetch wallet info for all events
+    // 4. Fetch wallet info for all events (including main_wallets.is_owned)
     const walletIds = [...new Set(unpublishedEvents.map((e) => e.wallet_id))];
     const { data: wallets, error: walletsError } = await supabase
       .from('wallets')
-      .select('id, wallet_id, main_wallet_id')
+      .select('id, wallet_id, main_wallet_id, main_wallets(nostr_hex_id, is_owned)')
       .in('id', walletIds);
 
     if (walletsError) {
@@ -250,26 +264,59 @@ Deno.serve(async (req) => {
     }
 
     const walletMap = new Map<string, WalletInfo>();
-    wallets?.forEach((w) => walletMap.set(w.id, w));
+    wallets?.forEach((w) => {
+      const row = w as WalletRow;
+      // Normalize main_wallets - handle both single object and array from Supabase
+      const mainWallet = Array.isArray(row.main_wallets) 
+        ? row.main_wallets[0] || null 
+        : row.main_wallets;
+      walletMap.set(w.id, {
+        id: row.id,
+        wallet_id: row.wallet_id,
+        main_wallet_id: row.main_wallet_id,
+        main_wallets: mainWallet,
+      });
+    });
 
-    // 5. Process each event
+    // Filter events to only those where is_owned = true
+    const ownedEvents = (unpublishedEvents as UnregisteredLanaEvent[]).filter((event) => {
+      const wallet = walletMap.get(event.wallet_id);
+      const isOwned = wallet?.main_wallets?.is_owned ?? false;
+      if (!isOwned) {
+        console.log(`⏭️ Skipping event ${event.id} - wallet owner has is_owned = false`);
+      }
+      return isOwned;
+    });
+
+    console.log(`📋 ${ownedEvents.length} events belong to owned wallets (is_owned = true)`);
+
+    // 5. Process each owned event
     let successCount = 0;
     let errorCount = 0;
+    let skippedCount = unpublishedEvents.length - ownedEvents.length;
     const processedEvents: Array<{ id: string; eventId: string; success: boolean }> = [];
 
-    for (const event of unpublishedEvents as UnregisteredLanaEvent[]) {
+    for (const event of ownedEvents) {
       try {
         const wallet = walletMap.get(event.wallet_id);
         const walletAddress = wallet?.wallet_id || event.wallet_id;
+        const userPubkey = wallet?.main_wallets?.nostr_hex_id || '';
+        
+        if (!userPubkey) {
+          console.warn(`⚠️ No nostr_hex_id found for event ${event.id}, skipping...`);
+          skippedCount++;
+          continue;
+        }
         
         // Convert amount to Latoshis
         const amountLatoshis = lanaToLatoshis(event.unregistered_amount);
 
-        // Create Kind 87003 event
+        // Create Kind 87003 event with required ["p", pubkey] tag
         const eventTemplate = {
           kind: 87003,
           created_at: Math.floor(Date.now() / 1000),
           tags: [
+            ['p', userPubkey],
             ['WalletID', walletAddress],
             ['Linked_event', event.nostr_event_id || ''],
             ['UnregistratedAmountLatoshis', amountLatoshis],
@@ -319,6 +366,8 @@ Deno.serve(async (req) => {
 
     console.log('📊 Final summary:', {
       total: unpublishedEvents.length,
+      ownedEvents: ownedEvents.length,
+      skipped: skippedCount,
       success: successCount,
       errors: errorCount,
     });
@@ -326,8 +375,10 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${unpublishedEvents.length} unregistered events`,
-        processed: unpublishedEvents.length,
+        message: `Processed ${ownedEvents.length} unregistered events (${skippedCount} skipped - not owned)`,
+        total: unpublishedEvents.length,
+        processed: ownedEvents.length,
+        skipped: skippedCount,
         successful: successCount,
         failed: errorCount,
         events: processedEvents,
