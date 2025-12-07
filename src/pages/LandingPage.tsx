@@ -41,7 +41,7 @@ const LandingPage = () => {
     registeredWallets: 0,
     todayTransactions: 0,
     yesterdayTransactions: 0,
-    totalAmount: 0,
+    totalMonitoredTransactions: 0,
   });
   const [recentBlocks, setRecentBlocks] = useState<any[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
@@ -126,18 +126,23 @@ const LandingPage = () => {
           .gte('created_at', yesterday.toISOString())
           .lt('created_at', today.toISOString());
 
-        // Fetch total amount from all transactions
-        const { data: allTransactions } = await supabase
+        // Fetch only transactions between DIFFERENT registered wallets (excluding self-transfers/staking)
+        const { data: monitoredTransactions } = await supabase
           .from('transactions')
-          .select('amount');
+          .select('amount, from_wallet_id, to_wallet_id')
+          .not('from_wallet_id', 'is', null)
+          .not('to_wallet_id', 'is', null);
 
-        const totalAmount = allTransactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+        // Filter out self-transfers (where from_wallet_id equals to_wallet_id)
+        const totalMonitoredAmount = monitoredTransactions
+          ?.filter(tx => tx.from_wallet_id !== tx.to_wallet_id)
+          .reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
 
         setStats({
           registeredWallets: walletsCount || 0,
           todayTransactions: todayTx?.length || 0,
           yesterdayTransactions: yesterdayTx?.length || 0,
-          totalAmount: totalAmount,
+          totalMonitoredTransactions: totalMonitoredAmount,
         });
 
         // Get total block count
@@ -463,6 +468,11 @@ const LandingPage = () => {
   const knightsTotalBalance = useMemo(() => knightsWallets.reduce((sum, w) => sum + w.balance, 0), [knightsWallets]);
   const allWalletsTotalBalance = useMemo(() => allWallets.reduce((sum, w) => sum + w.balance, 0), [allWallets]);
 
+  // Total balance of ALL registered wallets (Knights + All Wallets + Lana8Wonder)
+  const totalRegisteredBalance = useMemo(() => {
+    return walletBalances.reduce((sum, w) => sum + w.balance, 0);
+  }, [walletBalances]);
+
   const toggleSort = (field: 'name' | 'balance') => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -590,12 +600,23 @@ const LandingPage = () => {
           </p>
         </div>
 
-        {/* Currently Auditing */}
-        <div className="mb-12 flex items-center justify-center gap-2">
-          <Shield className="h-6 w-6 text-success" />
-          <span className="text-lg text-foreground">
-            Currently auditing <span className="font-bold text-primary">{stats.registeredWallets}</span> accounts
-          </span>
+        {/* Currently Auditing + Total Balance */}
+        <div className="mb-12 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Shield className="h-6 w-6 text-success" />
+            <span className="text-lg text-foreground">
+              Currently auditing <span className="font-bold text-primary">{stats.registeredWallets}</span> accounts
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Coins className="h-6 w-6 text-primary" />
+            <span className="text-lg text-foreground">
+              Total Amount of registered Lanas:{' '}
+              <span className="font-bold text-primary">
+                {walletsLoading ? 'Loading...' : `${totalRegisteredBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })} LANA`}
+              </span>
+            </span>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -630,9 +651,9 @@ const LandingPage = () => {
                 <Coins className="h-6 w-6 text-secondary-foreground" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Amount</p>
+                <p className="text-sm text-muted-foreground">Total Monitored Transactions</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {stats.totalAmount.toLocaleString('en-US')} LANA
+                  {stats.totalMonitoredTransactions.toLocaleString('en-US', { maximumFractionDigits: 2 })} LANA
                 </p>
               </div>
             </div>
