@@ -205,7 +205,7 @@ const SendToRegister = () => {
       
       toast.info('Building and broadcasting transaction...');
       
-      const response = await supabase.functions.invoke('send-and-register-lana', {
+      const response = await supabase.functions.invoke('return-lanas-and-send-KIND-87009', {
         body: {
           sender_address: fromWallet,
           recipients: [
