@@ -32,11 +32,11 @@ const SendToRegister = () => {
   
   // Fetch balance using the wallet ADDRESS (not UUID)
   const { balances, isLoading: isLoadingBalance } = useWalletBalances(fromWallet ? [fromWallet] : []);
-  const walletBalance = fromWallet ? balances.get(fromWallet) : undefined;
+  // Balance from edge function is already in LAN, not lanoshis
+  const balanceLana = fromWallet ? (balances.get(fromWallet) ?? 0) : 0;
   
   const amountLanoshis = parseInt(amount, 10);
   const amountLana = amountLanoshis / 100000000;
-  const balanceLana = walletBalance ? walletBalance / 100000000 : 0;
   const fee = 0.0001; // Estimated fee in LAN
   const totalNeeded = amountLana + fee;
   const hasSufficientBalance = balanceLana >= totalNeeded;
