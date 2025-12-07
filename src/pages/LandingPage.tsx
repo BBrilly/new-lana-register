@@ -1,4 +1,4 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -825,17 +825,18 @@ const LandingPage = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>#</TableHead>
+                        <TableHead>Owner</TableHead>
                         <TableHead>Wallet ID</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>TX ID</TableHead>
+                        <TableHead>Return TX</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedNostrEvents.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             No unregistered Lana events found from relays
                           </TableCell>
                         </TableRow>
@@ -844,6 +845,24 @@ const LandingPage = () => {
                           <TableRow key={event.id}>
                             <TableCell className="font-medium">
                               {((unregisteredPage - 1) * EVENTS_PER_PAGE) + index + 1}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                {event.profile ? (
+                                  <>
+                                    <div className="font-medium text-sm">
+                                      {event.profile.displayName || event.profile.name || 'Unknown'}
+                                    </div>
+                                    <div className="font-mono text-xs text-muted-foreground">
+                                      {event.userPubkey ? `${event.userPubkey.substring(0, 8)}...${event.userPubkey.slice(-4)}` : '-'}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="font-mono text-xs text-muted-foreground">
+                                    {event.userPubkey ? `${event.userPubkey.substring(0, 8)}...${event.userPubkey.slice(-4)}` : '-'}
+                                  </div>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="font-mono text-xs">
@@ -868,8 +887,20 @@ const LandingPage = () => {
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {event.txId ? `${event.txId.substring(0, 8)}...` : '-'}
+                            <TableCell>
+                              {event.isReturned && event.returnEvent?.txId ? (
+                                <a 
+                                  href={`https://chainz.cryptoid.info/lana/tx.dws?${event.returnEvent.txId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-primary hover:underline font-mono text-xs"
+                                >
+                                  {event.returnEvent.txId.substring(0, 8)}...
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))
