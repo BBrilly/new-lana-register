@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Wallets from "./pages/Wallets";
 import AddWallet from "./pages/AddWallet";
 import WalletConsolidate from "./pages/WalletConsolidate";
+import SendToRegister from "./pages/SendToRegister";
 import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/wallets" element={<Wallets />} />
           <Route path="/wallets/add" element={<AddWallet />} />
           <Route path="/wallets/:walletId/consolidate" element={<WalletConsolidate />} />
+          <Route path="/send-to-register" element={<SendToRegister />} />
           <Route path="/admin" element={<AdminPanel />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
