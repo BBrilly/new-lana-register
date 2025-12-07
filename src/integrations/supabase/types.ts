@@ -133,6 +133,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          is_owned: boolean
           name: string
           nostr_hex_id: string
           profile_pic_link: string | null
@@ -144,6 +145,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_owned?: boolean
           name: string
           nostr_hex_id: string
           profile_pic_link?: string | null
@@ -155,6 +157,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_owned?: boolean
           name?: string
           nostr_hex_id?: string
           profile_pic_link?: string | null
