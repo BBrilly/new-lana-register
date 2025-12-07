@@ -245,9 +245,9 @@ const SendToRegister = () => {
         { duration: 10000 }
       );
       
-      // Navigate back after success
+      // Navigate to wallets after success
       setTimeout(() => {
-        navigate(-1);
+        navigate('/wallets');
       }, 2000);
       
     } catch (err) {
