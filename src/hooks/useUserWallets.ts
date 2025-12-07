@@ -78,13 +78,35 @@ export const useUserWallets = () => {
           notification: undefined, // MOCK - will be implemented later
         }));
 
-        // Sort wallets: Main wallet first, then others
+        // Sort wallets by type priority: Main → LanaPays.Us → Knights → others → Lana8Wonder
+        const getTypePriority = (type: string, notes: string): number => {
+          const typeLower = type.toLowerCase();
+          if (typeLower.includes("main")) return 0;
+          if (typeLower.includes("lanapays")) return 1;
+          if (typeLower.includes("knight")) return 2;
+          if (typeLower.includes("lana8wonder")) return 999; // Always last
+          return 3; // Other types
+        };
+
+        // Extract number from notes for Lana8Wonder sorting
+        const getNotesNumber = (notes: string): number => {
+          const match = notes.match(/(\d+)/);
+          return match ? parseInt(match[1], 10) : 999999;
+        };
+
         const sortedWallets = mappedWallets.sort((a, b) => {
-          const aIsMain = a.type.toLowerCase().includes("main");
-          const bIsMain = b.type.toLowerCase().includes("main");
+          const priorityA = getTypePriority(a.type, a.description);
+          const priorityB = getTypePriority(b.type, b.description);
           
-          if (aIsMain && !bIsMain) return -1;
-          if (!aIsMain && bIsMain) return 1;
+          if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+          }
+          
+          // If both are Lana8Wonder, sort by number in notes
+          if (a.type.toLowerCase().includes("lana8wonder") && b.type.toLowerCase().includes("lana8wonder")) {
+            return getNotesNumber(a.description) - getNotesNumber(b.description);
+          }
+          
           return 0;
         });
 
