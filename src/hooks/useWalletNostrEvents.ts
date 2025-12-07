@@ -12,16 +12,27 @@ export interface Kind87003Event {
   createdAt: number;
 }
 
-// Cache for all Kind 87003 events to avoid fetching multiple times
-let cachedEvents: Kind87003Event[] | null = null;
+export interface Kind87009Event {
+  id: string;
+  linkedEventId: string; // The 87003 event this resolves
+  userPubkey: string;
+  txId?: string;
+  fromWallet?: string;
+  toWallet?: string;
+  amountLanoshis: string;
+  createdAt: number;
+}
+
+// Cache for all events
+let cached87003Events: Kind87003Event[] | null = null;
+let cached87009Events: Kind87009Event[] | null = null;
 let cacheTimestamp: number = 0;
 let isFetching: boolean = false;
-let fetchPromise: Promise<Kind87003Event[]> | null = null;
+let fetchPromise: Promise<{ events87003: Kind87003Event[]; events87009: Kind87009Event[] }> | null = null;
 const CACHE_DURATION_MS = 60000; // 1 minute cache
 
 // Function to fetch all events (shared between all hook instances)
-const fetchAllEvents = async (): Promise<Kind87003Event[]> => {
-  // Import dynamically to avoid issues
+const fetchAllEvents = async (): Promise<{ events87003: Kind87003Event[]; events87009: Kind87009Event[] }> => {
   const { getStoredParameters, getStoredRelayStatuses } = await import('@/utils/nostrClient');
   
   const params = getStoredParameters();
@@ -40,20 +51,20 @@ const fetchAllEvents = async (): Promise<Kind87003Event[]> => {
     ? connectedRelays 
     : (params?.relays || defaultRelays);
 
-  console.log(`🔍 Fetching ALL Kind 87003 events from ${relaysToUse.length} relays:`, relaysToUse);
+  console.log(`🔍 Fetching Kind 87003 and 87009 events from ${relaysToUse.length} relays:`, relaysToUse);
 
   const pool = new SimplePool();
 
-  const filter: Filter = {
-    kinds: [87003],
-    limit: 500
-  };
-
-  const fetchedEvents = await pool.querySync(relaysToUse, filter);
+  // Fetch both kinds in parallel
+  const [fetched87003, fetched87009] = await Promise.all([
+    pool.querySync(relaysToUse, { kinds: [87003], limit: 500 } as Filter),
+    pool.querySync(relaysToUse, { kinds: [87009], limit: 500 } as Filter)
+  ]);
   
-  console.log(`📥 Fetched ${fetchedEvents.length} total Kind 87003 events from relays`);
+  console.log(`📥 Fetched ${fetched87003.length} Kind 87003 events and ${fetched87009.length} Kind 87009 events`);
 
-  const allParsedEvents: Kind87003Event[] = fetchedEvents.map((event: Event) => {
+  // Parse 87003 events
+  const parsed87003: Kind87003Event[] = fetched87003.map((event: Event) => {
     const pTag = event.tags.find(t => t[0] === 'p');
     const walletIdTag = event.tags.find(t => t[0] === 'WalletID');
     const txTag = event.tags.find(t => t[0] === 'TX');
@@ -72,11 +83,33 @@ const fetchAllEvents = async (): Promise<Kind87003Event[]> => {
     };
   });
 
-  allParsedEvents.sort((a, b) => b.createdAt - a.createdAt);
+  // Parse 87009 events
+  const parsed87009: Kind87009Event[] = fetched87009.map((event: Event) => {
+    const pTag = event.tags.find(t => t[0] === 'p');
+    const eTag = event.tags.find(t => t[0] === 'e'); // Reference to 87003 event
+    const txTag = event.tags.find(t => t[0] === 'tx');
+    const fromWalletTag = event.tags.find(t => t[0] === 'from_wallet');
+    const toWalletTag = event.tags.find(t => t[0] === 'to_wallet');
+    const amountTag = event.tags.find(t => t[0] === 'amount_lanoshis');
+
+    return {
+      id: event.id,
+      linkedEventId: eTag?.[1] || '',
+      userPubkey: pTag?.[1] || '',
+      txId: txTag?.[1],
+      fromWallet: fromWalletTag?.[1],
+      toWallet: toWalletTag?.[1],
+      amountLanoshis: amountTag?.[1] || '0',
+      createdAt: event.created_at
+    };
+  });
+
+  parsed87003.sort((a, b) => b.createdAt - a.createdAt);
+  parsed87009.sort((a, b) => b.createdAt - a.createdAt);
   
   pool.close(relaysToUse);
   
-  return allParsedEvents;
+  return { events87003: parsed87003, events87009: parsed87009 };
 };
 
 export const useWalletNostrEvents = (walletAddress: string | undefined) => {
@@ -98,9 +131,15 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
         const now = Date.now();
         
         // Check if we have valid cached events
-        if (cachedEvents && (now - cacheTimestamp) < CACHE_DURATION_MS) {
-          const walletEvents = cachedEvents.filter(e => e.walletId === walletAddress);
-          console.log(`📦 Using cached events: ${walletEvents.length} for wallet ${walletAddress}`);
+        if (cached87003Events && cached87009Events && (now - cacheTimestamp) < CACHE_DURATION_MS) {
+          // Get set of resolved 87003 event IDs (those that have 87009)
+          const resolvedEventIds = new Set(cached87009Events.map(e => e.linkedEventId));
+          
+          // Filter: only show 87003 events for this wallet that are NOT resolved
+          const walletEvents = cached87003Events.filter(e => 
+            e.walletId === walletAddress && !resolvedEventIds.has(e.id)
+          );
+          console.log(`📦 Using cached events: ${walletEvents.length} unresolved for wallet ${walletAddress} (${resolvedEventIds.size} total resolved)`);
           setEvents(walletEvents);
           setIsLoading(false);
           return;
@@ -109,9 +148,12 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
         // If already fetching, wait for that fetch to complete
         if (isFetching && fetchPromise) {
           console.log(`⏳ Waiting for ongoing fetch for wallet ${walletAddress}`);
-          const allEvents = await fetchPromise;
-          const walletEvents = allEvents.filter(e => e.walletId === walletAddress);
-          console.log(`📥 Found ${walletEvents.length} events for wallet ${walletAddress}`);
+          const { events87003, events87009 } = await fetchPromise;
+          const resolvedEventIds = new Set(events87009.map(e => e.linkedEventId));
+          const walletEvents = events87003.filter(e => 
+            e.walletId === walletAddress && !resolvedEventIds.has(e.id)
+          );
+          console.log(`📥 Found ${walletEvents.length} unresolved events for wallet ${walletAddress}`);
           setEvents(walletEvents);
           setIsLoading(false);
           return;
@@ -121,17 +163,23 @@ export const useWalletNostrEvents = (walletAddress: string | undefined) => {
         isFetching = true;
         fetchPromise = fetchAllEvents();
         
-        const allEvents = await fetchPromise;
+        const { events87003, events87009 } = await fetchPromise;
         
         // Cache results
-        cachedEvents = allEvents;
+        cached87003Events = events87003;
+        cached87009Events = events87009;
         cacheTimestamp = Date.now();
         isFetching = false;
         fetchPromise = null;
 
-        // Filter for this wallet
-        const walletEvents = allEvents.filter(e => e.walletId === walletAddress);
-        console.log(`📥 Found ${walletEvents.length} events for wallet ${walletAddress}`);
+        // Get set of resolved 87003 event IDs
+        const resolvedEventIds = new Set(events87009.map(e => e.linkedEventId));
+
+        // Filter for this wallet AND only unresolved
+        const walletEvents = events87003.filter(e => 
+          e.walletId === walletAddress && !resolvedEventIds.has(e.id)
+        );
+        console.log(`📥 Found ${walletEvents.length} unresolved events for wallet ${walletAddress} (${resolvedEventIds.size} total resolved)`);
         setEvents(walletEvents);
       } catch (err) {
         console.error('Error fetching Nostr events:', err);
@@ -156,7 +204,8 @@ export const latoshisToLana = (latoshis: string): number => {
 
 // Function to clear cache (useful for manual refresh)
 export const clearNostrEventsCache = () => {
-  cachedEvents = null;
+  cached87003Events = null;
+  cached87009Events = null;
   cacheTimestamp = 0;
   isFetching = false;
   fetchPromise = null;
