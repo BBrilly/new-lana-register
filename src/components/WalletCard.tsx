@@ -232,7 +232,7 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
         )}
 
         {/* Nostr Kind 87003 Events */}
-        <WalletNostrEvents walletAddress={wallet.walletNumber} />
+        <WalletNostrEvents walletAddress={wallet.walletNumber} walletUuid={wallet.id} />
       </div>
     </Card>
   );

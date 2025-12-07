@@ -1,15 +1,18 @@
 import { useWalletNostrEvents, latoshisToLana } from '@/hooks/useWalletNostrEvents';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Radio, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Radio, ExternalLink, AlertTriangle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WalletNostrEventsProps {
   walletAddress: string | undefined;
+  walletUuid?: string;
 }
 
-const WalletNostrEvents = ({ walletAddress }: WalletNostrEventsProps) => {
+const WalletNostrEvents = ({ walletAddress, walletUuid }: WalletNostrEventsProps) => {
   const { events, isLoading, error } = useWalletNostrEvents(walletAddress);
+  const navigate = useNavigate();
 
   if (!walletAddress) {
     return null;
@@ -131,16 +134,27 @@ const WalletNostrEvents = ({ walletAddress }: WalletNostrEventsProps) => {
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold text-warning">
-                    {lanaAmount.toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 8
-                    })} LAN
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    ({event.unregisteredAmountLatoshis} latoshis)
-                  </p>
+                <div className="text-right shrink-0 space-y-2">
+                  <div>
+                    <p className="text-sm font-semibold text-warning">
+                      {lanaAmount.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 8
+                      })} LAN
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      ({event.unregisteredAmountLatoshis} latoshis)
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-primary/50 text-primary hover:bg-primary/10"
+                    onClick={() => navigate(`/send-to-register?amount=${event.unregisteredAmountLatoshis}&from=${walletAddress}&walletUuid=${walletUuid || ''}&eventId=${event.id}`)}
+                  >
+                    <Send className="mr-1 h-3 w-3" />
+                    Send to Register
+                  </Button>
                 </div>
               </div>
             </div>
