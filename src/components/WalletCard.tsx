@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import WalletNostrEvents from "./WalletNostrEvents";
 
 interface WalletCardProps {
   wallet: Wallet;
@@ -229,6 +230,9 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
             </div>
           </div>
         )}
+
+        {/* Nostr Kind 87003 Events */}
+        <WalletNostrEvents walletAddress={wallet.walletNumber} />
       </div>
     </Card>
   );
