@@ -32,6 +32,3 @@ verify_jwt = false
 
 [functions.analyze-wallet-utxos]
 verify_jwt = false
-
-[functions.migrate-unregistered-events]
-verify_jwt = false
