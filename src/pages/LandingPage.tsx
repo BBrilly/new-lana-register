@@ -865,8 +865,20 @@ const LandingPage = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="font-mono text-xs">
-                                {event.walletId ? `${event.walletId.substring(0, 8)}...${event.walletId.slice(-6)}` : '-'}
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs">
+                                  {event.walletId ? `${event.walletId.substring(0, 8)}...${event.walletId.slice(-6)}` : '-'}
+                                </span>
+                                {event.walletId && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => copyWalletId(event.walletId)}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-semibold">
