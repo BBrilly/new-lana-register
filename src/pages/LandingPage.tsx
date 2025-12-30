@@ -1,10 +1,10 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
 import NostrStatusDialog from "@/components/NostrStatusDialog";
 import BlockDetailDialog from "@/components/BlockDetailDialog";
@@ -54,6 +54,8 @@ const LandingPage = () => {
   const { events: nostrEvents, isLoading: nostrEventsLoading, error: nostrEventsError } = useAllNostrEvents();
   const [unregisteredPage, setUnregisteredPage] = useState(1);
   const EVENTS_PER_PAGE = 50;
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [eventNotes, setEventNotes] = useState<Record<string, string | null>>({});
 
   // Registered Lana Events (Knights transactions) state
   const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
@@ -207,6 +209,43 @@ const LandingPage = () => {
   const handleRefreshNostrEvents = () => {
     clearAllNostrEventsCache();
     window.location.reload();
+  };
+
+  // Fetch notes from database when expanding an event
+  const handleExpandEvent = async (eventId: string, nostrEventId: string) => {
+    if (expandedEventId === eventId) {
+      setExpandedEventId(null);
+      return;
+    }
+    
+    setExpandedEventId(eventId);
+    
+    // Check if we already have notes for this event
+    if (eventNotes[eventId] !== undefined) return;
+    
+    try {
+      const { data } = await supabase
+        .from('unregistered_lana_events')
+        .select('notes')
+        .eq('nostr_87003_event_id', nostrEventId)
+        .maybeSingle();
+      
+      setEventNotes(prev => ({
+        ...prev,
+        [eventId]: data?.notes || null
+      }));
+    } catch (error) {
+      console.error('Error fetching notes:', error);
+      setEventNotes(prev => ({
+        ...prev,
+        [eventId]: null
+      }));
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
   };
 
   // Load wallet balances for the third tab
@@ -842,79 +881,185 @@ const LandingPage = () => {
                         </TableRow>
                       ) : (
                         paginatedNostrEvents.map((event, index) => (
-                          <TableRow key={event.id}>
-                            <TableCell className="font-medium">
-                              {((unregisteredPage - 1) * EVENTS_PER_PAGE) + index + 1}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                {event.profile ? (
-                                  <>
-                                    <div className="font-medium text-sm">
-                                      {event.profile.displayName || event.profile.name || 'Unknown'}
-                                    </div>
+                          <React.Fragment key={event.id}>
+                            <TableRow 
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => handleExpandEvent(event.id, event.id)}
+                            >
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  {expandedEventId === event.id ? (
+                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                  {((unregisteredPage - 1) * EVENTS_PER_PAGE) + index + 1}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-1">
+                                  {event.profile ? (
+                                    <>
+                                      <div className="font-medium text-sm">
+                                        {event.profile.displayName || event.profile.name || 'Unknown'}
+                                      </div>
+                                      <div className="font-mono text-xs text-muted-foreground">
+                                        {event.userPubkey ? `${event.userPubkey.substring(0, 8)}...${event.userPubkey.slice(-4)}` : '-'}
+                                      </div>
+                                    </>
+                                  ) : (
                                     <div className="font-mono text-xs text-muted-foreground">
                                       {event.userPubkey ? `${event.userPubkey.substring(0, 8)}...${event.userPubkey.slice(-4)}` : '-'}
                                     </div>
-                                  </>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs">
+                                    {event.walletId ? `${event.walletId.substring(0, 8)}...${event.walletId.slice(-6)}` : '-'}
+                                  </span>
+                                  {event.walletId && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        copyWalletId(event.walletId);
+                                      }}
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {latoshisToLana(event.unregisteredAmountLatoshis).toFixed(4)} LANA
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {formatDistanceToNow(new Date(event.createdAt * 1000), { addSuffix: true })}
+                              </TableCell>
+                              <TableCell>
+                                {event.isReturned ? (
+                                  <Badge variant="default" className="bg-green-500/20 text-green-600 border-green-500/30">
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Returned
+                                  </Badge>
                                 ) : (
-                                  <div className="font-mono text-xs text-muted-foreground">
-                                    {event.userPubkey ? `${event.userPubkey.substring(0, 8)}...${event.userPubkey.slice(-4)}` : '-'}
-                                  </div>
+                                  <Badge variant="outline" className="text-yellow-600 border-yellow-500/30">
+                                    Pending
+                                  </Badge>
                                 )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs">
-                                  {event.walletId ? `${event.walletId.substring(0, 8)}...${event.walletId.slice(-6)}` : '-'}
-                                </span>
-                                {event.walletId && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => copyWalletId(event.walletId)}
+                              </TableCell>
+                              <TableCell>
+                                {event.isReturned && event.returnEvent?.txId ? (
+                                  <a 
+                                    href={`https://chainz.cryptoid.info/lana/tx.dws?${event.returnEvent.txId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-primary hover:underline font-mono text-xs"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    <Copy className="h-3 w-3" />
-                                  </Button>
+                                    {event.returnEvent.txId.substring(0, 8)}...
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
                                 )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold">
-                              {latoshisToLana(event.unregisteredAmountLatoshis).toFixed(4)} LANA
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {formatDistanceToNow(new Date(event.createdAt * 1000), { addSuffix: true })}
-                            </TableCell>
-                            <TableCell>
-                              {event.isReturned ? (
-                                <Badge variant="default" className="bg-green-500/20 text-green-600 border-green-500/30">
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Returned
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-yellow-600 border-yellow-500/30">
-                                  Pending
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {event.isReturned && event.returnEvent?.txId ? (
-                                <a 
-                                  href={`https://chainz.cryptoid.info/lana/tx.dws?${event.returnEvent.txId}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-primary hover:underline font-mono text-xs"
-                                >
-                                  {event.returnEvent.txId.substring(0, 8)}...
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
+                              </TableCell>
+                            </TableRow>
+                            {expandedEventId === event.id && (
+                              <TableRow>
+                                <TableCell colSpan={7} className="bg-muted/30 p-4">
+                                  <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase">Nostr Event ID</div>
+                                        <div className="flex items-center gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1 break-all">{event.id}</code>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(event.id, 'Event ID')}>
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase">Full Wallet ID</div>
+                                        <div className="flex items-center gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1 break-all">{event.walletId || '-'}</code>
+                                          {event.walletId && (
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(event.walletId, 'Wallet ID')}>
+                                              <Copy className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase">User Pubkey</div>
+                                        <div className="flex items-center gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1 break-all">{event.userPubkey || '-'}</code>
+                                          {event.userPubkey && (
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(event.userPubkey, 'User Pubkey')}>
+                                              <Copy className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase">Amount (Latoshis)</div>
+                                        <div className="flex items-center gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1">{event.unregisteredAmountLatoshis}</code>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(event.unregisteredAmountLatoshis, 'Amount')}>
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {event.txId && (
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase">Transaction ID</div>
+                                        <div className="flex items-center gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1 break-all">{event.txId}</code>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(event.txId!, 'Transaction ID')}>
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {event.content && (
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase">Event Content</div>
+                                        <div className="flex items-start gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1 break-all whitespace-pre-wrap">{event.content}</code>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(event.content, 'Content')}>
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    <div className="space-y-2">
+                                      <div className="text-xs font-semibold text-muted-foreground uppercase">Notes (from database)</div>
+                                      {eventNotes[event.id] === undefined ? (
+                                        <div className="text-xs text-muted-foreground">Loading...</div>
+                                      ) : eventNotes[event.id] ? (
+                                        <div className="flex items-start gap-2">
+                                          <code className="text-xs bg-background p-2 rounded border flex-1 break-all whitespace-pre-wrap">{eventNotes[event.id]}</code>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(eventNotes[event.id]!, 'Notes')}>
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="text-xs text-muted-foreground italic">No notes available</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
                         ))
                       )}
                     </TableBody>
