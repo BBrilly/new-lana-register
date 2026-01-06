@@ -138,16 +138,63 @@ Deno.serve(async (req) => {
     const blocksThisRun = blocksToProcess.slice(0, MAX_BLOCKS_PER_RUN);
     console.log(`Processing ${blocksThisRun.length} blocks this run: [${blocksThisRun.join(', ')}]`);
 
-    // Get all registered wallet addresses with wallet_type for efficiency
-    const { data: registeredWallets } = await supabase
-      .from('wallets')
-      .select('wallet_id, id, wallet_type');
+    // Robustna funkcija za pobiranje VSEH registriranih denarnic s paginacijo
+    async function fetchAllRegisteredWallets(): Promise<{
+      walletAddresses: Set<string>;
+      walletMap: Map<string, { id: string; wallet_type: string }>;
+    }> {
+      const walletAddresses = new Set<string>();
+      const walletMap = new Map<string, { id: string; wallet_type: string }>();
+      
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      
+      console.log('Fetching all registered wallets with pagination...');
+      
+      while (hasMore) {
+        const { data: wallets, error } = await supabase
+          .from('wallets')
+          .select('wallet_id, id, wallet_type')
+          .range(offset, offset + PAGE_SIZE - 1);
+        
+        if (error) {
+          console.error(`Error fetching wallets at offset ${offset}:`, error);
+          throw error;
+        }
+        
+        if (!wallets || wallets.length === 0) {
+          hasMore = false;
+          console.log(`Pagination complete. No more wallets at offset ${offset}`);
+        } else {
+          // Dodaj najdene denarnice v Set in Map
+          for (const w of wallets) {
+            if (w.wallet_id) {
+              walletAddresses.add(w.wallet_id);
+              walletMap.set(w.wallet_id, {
+                id: w.id,
+                wallet_type: w.wallet_type
+              });
+            }
+          }
+          
+          console.log(`Fetched ${wallets.length} wallets (offset: ${offset}, total so far: ${walletAddresses.size})`);
+          
+          // Če smo dobili manj kot PAGE_SIZE, smo na koncu
+          if (wallets.length < PAGE_SIZE) {
+            hasMore = false;
+          } else {
+            offset += PAGE_SIZE;
+          }
+        }
+      }
+      
+      console.log(`✅ Total registered wallets loaded: ${walletAddresses.size}`);
+      return { walletAddresses, walletMap };
+    }
 
-    const walletAddresses = new Set(registeredWallets?.map(w => w.wallet_id) || []);
-    const walletMap = new Map(registeredWallets?.map(w => [w.wallet_id, {
-      id: w.id,
-      wallet_type: w.wallet_type
-    }]) || []);
+    // Get all registered wallet addresses with wallet_type using robust pagination
+    const { walletAddresses, walletMap } = await fetchAllRegisteredWallets();
 
     let totalTransactionsProcessed = 0;
     let totalRegisteredTransactions = 0;
