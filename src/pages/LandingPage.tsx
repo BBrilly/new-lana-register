@@ -272,7 +272,7 @@ const LandingPage = () => {
                 wallet_type,
                 main_wallet:main_wallets(name, display_name)
               `)
-              .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder'])
+              .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder', 'LanaPays.Us'])
               .range(offset, offset + PAGE_SIZE - 1);
             
             if (error) {
@@ -468,9 +468,17 @@ const LandingPage = () => {
     return walletBalances.filter(w => w.wallet_type === 'Lana8Wonder');
   }, [walletBalances]);
 
+  const lanaPayUsWallets = useMemo(() => {
+    return walletBalances.filter(w => w.wallet_type === 'LanaPays.Us');
+  }, [walletBalances]);
+
   const lana8WonderTotalBalance = useMemo(() => {
     return lana8WonderWallets.reduce((sum, w) => sum + w.balance, 0);
   }, [lana8WonderWallets]);
+
+  const lanaPayUsTotalBalance = useMemo(() => {
+    return lanaPayUsWallets.reduce((sum, w) => sum + w.balance, 0);
+  }, [lanaPayUsWallets]);
 
   const sortWallets = (wallets: WalletWithBalance[]) => {
     return [...wallets].sort((a, b) => {
@@ -488,6 +496,7 @@ const LandingPage = () => {
 
   const sortedKnightsWallets = useMemo(() => sortWallets(knightsWallets), [knightsWallets, sortField, sortDirection]);
   const sortedAllWallets = useMemo(() => sortWallets(allWallets), [allWallets, sortField, sortDirection]);
+  const sortedLanaPayUsWallets = useMemo(() => sortWallets(lanaPayUsWallets), [lanaPayUsWallets, sortField, sortDirection]);
 
   const knightsTotalBalance = useMemo(() => knightsWallets.reduce((sum, w) => sum + w.balance, 0), [knightsWallets]);
   const allWalletsTotalBalance = useMemo(() => allWallets.reduce((sum, w) => sum + w.balance, 0), [allWallets]);
@@ -744,6 +753,10 @@ const LandingPage = () => {
               <TabsTrigger value="allwallets" className="gap-2">
                 <Wallet className="h-4 w-4" />
                 All Wallets ({allWallets.length})
+              </TabsTrigger>
+              <TabsTrigger value="lanapaysus" className="gap-2">
+                <Wallet className="h-4 w-4" />
+                LanaPays.Us ({lanaPayUsWallets.length})
               </TabsTrigger>
               <TabsTrigger value="lana8wonder" className="gap-2">
                 <Coins className="h-4 w-4" />
@@ -1331,6 +1344,122 @@ const LandingPage = () => {
                               <Badge variant="outline" className="text-xs">
                                 {wallet.wallet_type}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {wallet.wallet_id ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    {`${wallet.wallet_id.substring(0, 8)}...${wallet.wallet_id.slice(-6)}`}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => copyWalletId(wallet.wallet_id!)}
+                                  >
+                                    {copiedId === wallet.wallet_id ? (
+                                      <Check className="h-3 w-3 text-success" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* LanaPays.Us Wallets Tab */}
+            <TabsContent value="lanapaysus">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Balance overview for LanaPays.Us wallet type ({lanaPayUsWallets.length} wallets)
+                </p>
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground">Total: </span>
+                  <span className="font-bold text-lg text-primary">
+                    {lanaPayUsTotalBalance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
+                  </span>
+                </div>
+              </div>
+
+              {walletsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -ml-3 font-medium"
+                            onClick={() => {
+                              if (sortField === 'name') {
+                                setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setSortField('name');
+                                setSortDirection('asc');
+                              }
+                            }}
+                          >
+                            Name
+                            {sortField === 'name' && (
+                              sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </TableHead>
+                        <TableHead>Wallet ID</TableHead>
+                        <TableHead className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -mr-3 font-medium"
+                            onClick={() => {
+                              if (sortField === 'balance') {
+                                setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setSortField('balance');
+                                setSortDirection('desc');
+                              }
+                            }}
+                          >
+                            Balance
+                            {sortField === 'balance' && (
+                              sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedLanaPayUsWallets.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            No LanaPays.Us wallets found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        sortedLanaPayUsWallets.map((wallet, index) => (
+                          <TableRow key={wallet.id}>
+                            <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                            <TableCell>
+                              <span className="font-medium">{wallet.display_name || wallet.name}</span>
                             </TableCell>
                             <TableCell>
                               {wallet.wallet_id ? (
