@@ -254,16 +254,52 @@ const LandingPage = () => {
       try {
         setWalletsLoading(true);
         
-        // Fetch wallets with types: Wallets, main Wallet, Knights
-        const { data: wallets } = await supabase
-          .from('wallets')
-          .select(`
-            id,
-            wallet_id,
-            wallet_type,
-            main_wallet:main_wallets(name, display_name)
-          `)
-          .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder']);
+        // Robustna funkcija za pobiranje VSEH denarnic s paginacijo
+        const fetchAllWallets = async () => {
+          const allWallets: any[] = [];
+          const PAGE_SIZE = 1000;
+          let offset = 0;
+          let hasMore = true;
+          
+          console.log('Fetching all wallets with pagination...');
+          
+          while (hasMore) {
+            const { data: wallets, error } = await supabase
+              .from('wallets')
+              .select(`
+                id,
+                wallet_id,
+                wallet_type,
+                main_wallet:main_wallets(name, display_name)
+              `)
+              .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder'])
+              .range(offset, offset + PAGE_SIZE - 1);
+            
+            if (error) {
+              console.error(`Error fetching wallets at offset ${offset}:`, error);
+              throw error;
+            }
+            
+            if (!wallets || wallets.length === 0) {
+              hasMore = false;
+              console.log(`Pagination complete. No more wallets at offset ${offset}`);
+            } else {
+              allWallets.push(...wallets);
+              console.log(`Fetched ${wallets.length} wallets (offset: ${offset}, total so far: ${allWallets.length})`);
+              
+              if (wallets.length < PAGE_SIZE) {
+                hasMore = false;
+              } else {
+                offset += PAGE_SIZE;
+              }
+            }
+          }
+          
+          console.log(`✅ Total wallets loaded: ${allWallets.length}`);
+          return allWallets;
+        };
+
+        const wallets = await fetchAllWallets();
 
         if (!wallets || wallets.length === 0) {
           setWalletBalances([]);
