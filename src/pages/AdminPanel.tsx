@@ -61,12 +61,31 @@ const AdminPanel = () => {
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ["analytics-dashboard", refreshKey],
     queryFn: async () => {
-      // Fetch all wallets with their types
-      const { data: wallets, error: walletsError } = await supabase
-        .from("wallets")
-        .select("id, wallet_id, wallet_type");
+      // Fetch all wallets with their types using pagination
+      const PAGE_SIZE = 1000;
+      let allWallets: WalletWithType[] = [];
+      let offset = 0;
+      let hasMore = true;
 
-      if (walletsError) throw walletsError;
+      while (hasMore) {
+        const { data: walletsBatch, error: walletsError } = await supabase
+          .from("wallets")
+          .select("id, wallet_id, wallet_type")
+          .range(offset, offset + PAGE_SIZE - 1);
+
+        if (walletsError) throw walletsError;
+
+        if (walletsBatch && walletsBatch.length > 0) {
+          allWallets = [...allWallets, ...walletsBatch];
+          offset += PAGE_SIZE;
+          hasMore = walletsBatch.length === PAGE_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const wallets = allWallets;
+      console.log(`Fetched ${wallets.length} wallets total`);
 
       // Fetch system parameters for electrum servers
       const { data: sysParams, error: paramsError } = await supabase
