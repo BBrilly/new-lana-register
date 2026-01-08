@@ -65,7 +65,7 @@ const LandingPage = () => {
   // Wallet balances state
   const [walletBalances, setWalletBalances] = useState<WalletWithBalance[]>([]);
   const [walletsLoading, setWalletsLoading] = useState(false);
-  const [sortField, setSortField] = useState<'name' | 'balance'>('balance');
+  const [sortField, setSortField] = useState<'name' | 'balance' | 'wallet_type'>('balance');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -484,6 +484,12 @@ const LandingPage = () => {
     return [...wallets].sort((a, b) => {
       if (sortField === 'balance') {
         return sortDirection === 'desc' ? b.balance - a.balance : a.balance - b.balance;
+      } else if (sortField === 'wallet_type') {
+        const typeA = a.wallet_type.toLowerCase();
+        const typeB = b.wallet_type.toLowerCase();
+        return sortDirection === 'desc' 
+          ? typeB.localeCompare(typeA)
+          : typeA.localeCompare(typeB);
       } else {
         const nameA = (a.display_name || a.name || '').toLowerCase();
         const nameB = (b.display_name || b.name || '').toLowerCase();
@@ -506,7 +512,7 @@ const LandingPage = () => {
     return walletBalances.reduce((sum, w) => sum + w.balance, 0);
   }, [walletBalances]);
 
-  const toggleSort = (field: 'name' | 'balance') => {
+  const toggleSort = (field: 'name' | 'balance' | 'wallet_type') => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -1309,7 +1315,17 @@ const LandingPage = () => {
                             <ArrowUpDown className="h-3 w-3" />
                           </Button>
                         </TableHead>
-                        <TableHead>Wallet Type</TableHead>
+                        <TableHead>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="gap-1 -ml-3 font-medium"
+                            onClick={() => toggleSort('wallet_type')}
+                          >
+                            Wallet Type
+                            <ArrowUpDown className="h-3 w-3" />
+                          </Button>
+                        </TableHead>
                         <TableHead>Wallet ID</TableHead>
                         <TableHead className="text-right">
                           <Button 
