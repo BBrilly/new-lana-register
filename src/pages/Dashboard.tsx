@@ -61,9 +61,6 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Wallet Owner Search */}
-        <WalletOwnerSearch />
-
         {/* Welcome Message with Profile */}
         {userProfile && (
           <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
@@ -86,6 +83,9 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+
+        {/* Wallet Owner Search */}
+        <WalletOwnerSearch />
 
         <div className="flex items-center justify-between">
           <div>
