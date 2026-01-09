@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import StatCard from "@/components/StatCard";
 import AddWalletDialog from "@/components/AddWalletDialog";
+import WalletOwnerSearch from "@/components/WalletOwnerSearch";
 import { Wallet as WalletIcon, TrendingUp, DollarSign, Activity } from "lucide-react";
 import { isAuthenticated, getAuthSession, getUserProfile } from "@/utils/wifAuth";
 import { useUserWallets } from "@/hooks/useUserWallets";
@@ -60,6 +61,9 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="space-y-8">
+        {/* Wallet Owner Search */}
+        <WalletOwnerSearch />
+
         {/* Welcome Message with Profile */}
         {userProfile && (
           <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
