@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
-import { getAuthSession } from '@/utils/wifAuth';
+import { getAuthSession, convertWifToIds } from '@/utils/wifAuth';
 import { getStoredParameters, getStoredRelayStatuses } from '@/utils/nostrClient';
 const SendToRegister = () => {
   const [searchParams] = useSearchParams();
@@ -171,6 +171,17 @@ const SendToRegister = () => {
     setIsSending(true);
     
     try {
+      // Validate that WIF matches the sender wallet address
+      toast.info('Validating private key...');
+      const wifResult = await convertWifToIds(privateKey.trim());
+      
+      if (wifResult.walletId !== fromWallet) {
+        toast.error(`Private key does not match sender wallet. Expected: ${fromWallet}, Got: ${wifResult.walletId}`);
+        setIsSending(false);
+        return;
+      }
+      
+      toast.success('Private key validated successfully');
       // Get user session for pubkey
       const authSession = getAuthSession();
       if (!authSession) {
