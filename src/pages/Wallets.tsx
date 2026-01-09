@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUserWallets } from "@/hooks/useUserWallets";
 import { Skeleton } from "@/components/ui/skeleton";
+import WalletOwnerSearch from "@/components/WalletOwnerSearch";
 
 const Wallets = () => {
   const navigate = useNavigate();
@@ -31,6 +32,9 @@ const Wallets = () => {
             Add Wallet
           </Button>
         </div>
+
+        {/* Wallet Owner Search */}
+        <WalletOwnerSearch />
 
         {isLoading ? (
           <div className="grid gap-6 lg:grid-cols-2">
