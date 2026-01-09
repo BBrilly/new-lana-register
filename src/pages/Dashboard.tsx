@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import StatCard from "@/components/StatCard";
 import AddWalletDialog from "@/components/AddWalletDialog";
-import WalletOwnerSearch from "@/components/WalletOwnerSearch";
+
 import { Wallet as WalletIcon, TrendingUp, DollarSign, Activity } from "lucide-react";
 import { isAuthenticated, getAuthSession, getUserProfile } from "@/utils/wifAuth";
 import { useUserWallets } from "@/hooks/useUserWallets";
@@ -84,8 +84,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Wallet Owner Search */}
-        <WalletOwnerSearch />
 
         <div className="flex items-center justify-between">
           <div>
