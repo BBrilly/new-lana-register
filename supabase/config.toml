@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.analyze-wallet-utxos]
 verify_jwt = false
+
+[functions.register-virgin-wallets]
+verify_jwt = false
