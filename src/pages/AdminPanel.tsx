@@ -5,11 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, RefreshCw, Wallet, TrendingUp } from "lucide-react";
+import { Shield, RefreshCw, Wallet, TrendingUp, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import StatCard from "@/components/StatCard";
+import ApiKeysManager from "@/components/ApiKeysManager";
 
 interface UnregisteredEvent {
   id: string;
@@ -204,6 +205,10 @@ const AdminPanel = () => {
           <TabsList>
             <TabsTrigger value="events">Unregistered Events</TabsTrigger>
             <TabsTrigger value="analytics">Analytics Dashboard</TabsTrigger>
+            <TabsTrigger value="api-keys" className="flex items-center gap-1">
+              <Key className="h-4 w-4" />
+              API Keys
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="events" className="space-y-4">
@@ -336,6 +341,10 @@ const AdminPanel = () => {
                 Failed to load analytics data
               </p>
             )}
+          </TabsContent>
+
+          <TabsContent value="api-keys" className="space-y-4">
+            <ApiKeysManager />
           </TabsContent>
         </Tabs>
       </div>
