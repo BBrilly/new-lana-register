@@ -35,6 +35,51 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          api_key: string
+          can_register_lana: boolean
+          contact_info: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          last_request_at: string | null
+          rate_limit_per_hour: number
+          request_count_current_hour: number
+          service_name: string
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          can_register_lana?: boolean
+          contact_info?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_request_at?: string | null
+          rate_limit_per_hour?: number
+          request_count_current_hour?: number
+          service_name: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          can_register_lana?: boolean
+          contact_info?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_request_at?: string | null
+          rate_limit_per_hour?: number
+          request_count_current_hour?: number
+          service_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
