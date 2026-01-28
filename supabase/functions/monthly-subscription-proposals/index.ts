@@ -14,11 +14,11 @@ const REGISTRAR_NSEC = "nsec1v6dd5ftmjzpmw0khj4xnmwmcql5qqwuv9afp8qy878jg6qn5m58
 // Recipient pubkey for subscription payments
 const RECIPIENT_PUBKEY = "bcb0cf91fb810b54c7cf18a1ababca455b008e2a7ebdf303a7c2a72bbc0f521e";
 
-// Test mode pubkey - only this user will receive proposals during testing
-const TEST_PUBKEY = "56e8670aa65491f8595dc3a71c94aa7445dcdca755ca5f77c07218498a362061";
-
 // Batch size for relay publishing
 const RELAY_BATCH_SIZE = 50;
+
+// Batch size for user processing (process 30 users concurrently)
+const USER_BATCH_SIZE = 30;
 
 function bech32Decode(str: string): Uint8Array {
   const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
@@ -148,16 +148,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse request body for test mode
-    let testMode = true; // Default to test mode for safety
-    try {
-      const body = await req.json();
-      testMode = body.testMode !== false; // Only disable test mode if explicitly set to false
-    } catch {
-      // No body or invalid JSON, use default test mode
-    }
-
-    console.log(`🚀 Starting monthly subscription proposals (testMode: ${testMode})`);
+    console.log(`🚀 Starting monthly subscription proposals`);
 
     // Get current month in YYYY-MM format
     const now = new Date();
@@ -236,12 +227,6 @@ Deno.serve(async (req) => {
     let targetWallets = Array.from(uniqueWallets.values());
     console.log(`👥 Found ${targetWallets.length} eligible users`);
 
-    // In test mode, only process the test pubkey
-    if (testMode) {
-      targetWallets = targetWallets.filter(w => w.nostr_hex_id === TEST_PUBKEY);
-      console.log(`🧪 Test mode: filtered to ${targetWallets.length} user(s)`);
-    }
-
     // Check which users already have a proposal for this month
     const nostrIds = targetWallets.map(w => w.nostr_hex_id);
     const { data: existingProposals, error: existingError } = await supabase
@@ -268,68 +253,83 @@ Deno.serve(async (req) => {
       errors: [] as string[],
     };
 
-    // Process each wallet
-    for (const wallet of walletsToProcess) {
-      results.processed++;
-      const userName = wallet.display_name || wallet.name || 'User';
+    // Process wallets in batches of USER_BATCH_SIZE
+    for (let i = 0; i < walletsToProcess.length; i += USER_BATCH_SIZE) {
+      const batch = walletsToProcess.slice(i, i + USER_BATCH_SIZE);
+      console.log(`📦 Processing batch ${Math.floor(i / USER_BATCH_SIZE) + 1}/${Math.ceil(walletsToProcess.length / USER_BATCH_SIZE)} (${batch.length} users)`);
       
-      try {
-        const proposalId = `registrar:subscription:${wallet.nostr_hex_id.slice(0, 8)}:${currentMonth}`;
-        const createdAt = Math.floor(Date.now() / 1000);
-
-        // Create KIND 90900 event
-        const eventData: Partial<NostrEvent> = {
-          pubkey,
-          created_at: createdAt,
-          kind: 90900,
-          tags: [
-            ["d", proposalId],
-            ["p", wallet.nostr_hex_id, "payer"],
-            ["p", RECIPIENT_PUBKEY, "recipient"],
-            ["wallet", lanaWallet],
-            ["fiat", currencyCode, subscriptionFeeEur.toFixed(2)],
-            ["lana", amountLana.toFixed(8)],
-            ["lanoshi", amountLanoshi.toString()],
-            ["type", "unconditional_payment"],
-            ["service", "Registrar"],
-          ],
-          content: `Monthly subscription proposal for Lana8Wonder service (${currentMonth}). Fee: ${subscriptionFeeEur.toFixed(2)} ${currencyCode} = ${amountLana.toFixed(2)} LANA.`,
-        };
-
-        const signedEvent = await signEvent(eventData, privateKey);
+      const batchPromises = batch.map(async (wallet) => {
+        const userName = wallet.display_name || wallet.name || 'User';
         
-        // Publish to relays
-        const { success, publishedTo } = await publishEventToRelays(signedEvent, relays);
-        
-        if (success) {
-          // Store in database
-          const { error: insertError } = await supabase
-            .from('subscription_proposals')
-            .insert({
-              main_wallet_id: wallet.id,
-              nostr_hex_id: wallet.nostr_hex_id,
-              proposal_month: currentMonth,
-              amount_eur: subscriptionFeeEur,
-              amount_lana: amountLana,
-              amount_lanoshi: amountLanoshi,
-              exchange_rate: exchangeRate,
-              nostr_event_id: signedEvent.id,
-            });
+        try {
+          const proposalId = `registrar:subscription:${wallet.nostr_hex_id.slice(0, 8)}:${currentMonth}`;
+          const createdAt = Math.floor(Date.now() / 1000);
 
-          if (insertError) {
-            throw new Error(`DB insert failed: ${insertError.message}`);
+          // Create KIND 90900 event
+          const eventData: Partial<NostrEvent> = {
+            pubkey,
+            created_at: createdAt,
+            kind: 90900,
+            tags: [
+              ["d", proposalId],
+              ["p", wallet.nostr_hex_id, "payer"],
+              ["p", RECIPIENT_PUBKEY, "recipient"],
+              ["wallet", lanaWallet],
+              ["fiat", currencyCode, subscriptionFeeEur.toFixed(2)],
+              ["lana", amountLana.toFixed(8)],
+              ["lanoshi", amountLanoshi.toString()],
+              ["type", "unconditional_payment"],
+              ["service", "Registrar"],
+            ],
+            content: `Monthly subscription proposal for Lana8Wonder service (${currentMonth}). Fee: ${subscriptionFeeEur.toFixed(2)} ${currencyCode} = ${amountLana.toFixed(2)} LANA.`,
+          };
+
+          const signedEvent = await signEvent(eventData, privateKey);
+          
+          // Publish to relays
+          const { success, publishedTo } = await publishEventToRelays(signedEvent, relays);
+          
+          if (success) {
+            // Store in database
+            const { error: insertError } = await supabase
+              .from('subscription_proposals')
+              .insert({
+                main_wallet_id: wallet.id,
+                nostr_hex_id: wallet.nostr_hex_id,
+                proposal_month: currentMonth,
+                amount_eur: subscriptionFeeEur,
+                amount_lana: amountLana,
+                amount_lanoshi: amountLanoshi,
+                exchange_rate: exchangeRate,
+                nostr_event_id: signedEvent.id,
+              });
+
+            if (insertError) {
+              throw new Error(`DB insert failed: ${insertError.message}`);
+            }
+
+            console.log(`✅ Sent proposal to ${userName} (${wallet.nostr_hex_id.slice(0, 8)}...) - published to ${publishedTo.length} relays`);
+            return { success: true };
+          } else {
+            throw new Error('Failed to publish to any relay');
           }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.error(`❌ Failed for ${userName}: ${errorMsg}`);
+          return { success: false, error: `${wallet.nostr_hex_id.slice(0, 8)}: ${errorMsg}` };
+        }
+      });
 
-          console.log(`✅ Sent proposal to ${userName} (${wallet.nostr_hex_id.slice(0, 8)}...) - published to ${publishedTo.length} relays`);
+      const batchResults = await Promise.all(batchPromises);
+      
+      for (const result of batchResults) {
+        results.processed++;
+        if (result.success) {
           results.success++;
         } else {
-          throw new Error('Failed to publish to any relay');
+          results.failed++;
+          if (result.error) results.errors.push(result.error);
         }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error(`❌ Failed for ${userName}: ${errorMsg}`);
-        results.failed++;
-        results.errors.push(`${wallet.nostr_hex_id.slice(0, 8)}: ${errorMsg}`);
       }
     }
 
@@ -338,7 +338,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       month: currentMonth,
-      testMode,
       results,
       settings: {
         lanaWallet,
