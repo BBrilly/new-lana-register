@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.register-virgin-wallets]
 verify_jwt = false
+
+[functions.monthly-subscription-proposals]
+verify_jwt = false
