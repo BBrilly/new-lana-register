@@ -290,6 +290,56 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_proposals: {
+        Row: {
+          amount_eur: number
+          amount_lana: number
+          amount_lanoshi: number
+          created_at: string | null
+          exchange_rate: number
+          id: string
+          main_wallet_id: string
+          nostr_event_id: string | null
+          nostr_hex_id: string
+          proposal_month: string
+          published_at: string | null
+        }
+        Insert: {
+          amount_eur: number
+          amount_lana: number
+          amount_lanoshi: number
+          created_at?: string | null
+          exchange_rate: number
+          id?: string
+          main_wallet_id: string
+          nostr_event_id?: string | null
+          nostr_hex_id: string
+          proposal_month: string
+          published_at?: string | null
+        }
+        Update: {
+          amount_eur?: number
+          amount_lana?: number
+          amount_lanoshi?: number
+          created_at?: string | null
+          exchange_rate?: number
+          id?: string
+          main_wallet_id?: string
+          nostr_event_id?: string | null
+          nostr_hex_id?: string
+          proposal_month?: string
+          published_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_proposals_main_wallet_id_fkey"
+            columns: ["main_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "main_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_parameters: {
         Row: {
           created_at: number
