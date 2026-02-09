@@ -1,70 +1,66 @@
 
-# Popravek: API Key validacija v register-virgin-wallets
 
-## Problem
+# Implementacija dodajanja denarnic preko registrar API kljuca
 
-Edge funkcija `register-virgin-wallets` preverja API kljuc v napacni tabeli. Trenutno isce kljuc v tabeli `app_settings` pod kljucem `registrar_api_key`, ki pa ne obstaja. Dejanski API kljuci so shranjeni v tabeli `api_keys`.
+## Kaj se spremeni
 
-Ko poklices API s kljucem `ak_2phlibhnmhnqoie2hugf0h`, funkcija ne najde nastavitve v `app_settings` in vrne napako "API key configuration not found".
+Gumb "Add Wallet" na strani `/wallets/add` bo dejansko poklical edge funkcijo `register-virgin-wallets` z registrarjevim API kljucem `lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe`, tako da bo registracija identična zunanjemu API klicu.
 
-## Resitev
+## Kako bo delovalo
 
-Spremenil bom validacijo API kljuca v edge funkciji, da bo preverjala tabelo `api_keys` namesto `app_settings`.
+1. Uporabnik vnese wallet naslov, izbere tip in opis
+2. Validacija preveri strukturo naslova, da ni duplikat, in da je balance 0 (to ze deluje)
+3. Ob kliku "Add Wallet":
+   - Prebere `nostrHexId` prijavljenega uporabnika iz seje
+   - Poklice `register-virgin-wallets` edge funkcijo z registrarjevim kljucem
+   - Prikaze rezultat (uspeh ali napaka)
+   - Ob uspehu preusmeri nazaj na `/wallets`
 
 ## Tehnicni detajli
 
-**Datoteka:** `supabase/functions/register-virgin-wallets/index.ts`
+**Datoteka:** `src/pages/AddWallet.tsx`
 
-Trenutna (napacna) logika na vrsticah 152-185:
-- Isce `registrar_api_key` v tabeli `app_settings`
-- Primerja poslan kljuc z najdeno vrednostjo
-
-Nova logika:
-- Poisca poslan `api_key` v tabeli `api_keys` (stolpec `api_key`)
-- Preveri, da je kljuc aktiven (`is_active = true`)
-- Preveri rate limiting (`rate_limit_per_hour` in `request_count_current_hour`)
-- Posodobi `last_request_at` in `request_count_current_hour` ob uspesni uporabi
+Spremembe:
+- Uvoz `getAuthSession` iz `@/utils/wifAuth`
+- Dodano stanje `isSubmitting` za loading indikator
+- `handleSubmit` zamenja TODO komentar z dejanskim klicem:
 
 ```typescript
-// Step 1: Validate API Key against api_keys table
-const { data: apiKeyRecord, error: apiKeyError } = await supabase
-  .from("api_keys")
-  .select("id, api_key, is_active, rate_limit_per_hour, request_count_current_hour")
-  .eq("api_key", body.api_key)
-  .maybeSingle();
-
-if (apiKeyError || !apiKeyRecord) {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      status: "unauthorized",
-      error: "Invalid API key",
-      correlation_id: correlationId
-    }),
-    { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+const session = getAuthSession();
+if (!session) {
+  toast.error("You must be logged in to add a wallet");
+  return;
 }
 
-if (!apiKeyRecord.is_active) {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      status: "unauthorized",
-      error: "API key is deactivated",
-      correlation_id: correlationId
-    }),
-    { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
+setIsSubmitting(true);
+try {
+  const { data, error } = await supabase.functions.invoke("register-virgin-wallets", {
+    body: {
+      method: "register_virgin_wallets_for_existing_user",
+      api_key: "lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe",
+      data: {
+        nostr_id_hex: session.nostrHexId,
+        wallets: [{
+          wallet_id: walletNumber,
+          wallet_type: type,
+          notes: description
+        }]
+      }
+    }
+  });
 
-// Update usage tracking
-await supabase
-  .from("api_keys")
-  .update({
-    last_request_at: new Date().toISOString(),
-    request_count_current_hour: (apiKeyRecord.request_count_current_hour || 0) + 1
-  })
-  .eq("id", apiKeyRecord.id);
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || "Registration failed");
+
+  toast.success("Wallet successfully registered!");
+  navigate("/wallets");
+} catch (err) {
+  toast.error(err.message || "Failed to register wallet");
+} finally {
+  setIsSubmitting(false);
+}
 ```
 
-To je edina sprememba - ostala logika funkcije ostane nespremenjena.
+- Gumb "Add Wallet" prikaze spinner med posiljanjem in je onemogocen med klicem
+- `isSubmitting` dodan v disable pogoje gumba
+
