@@ -1,11 +1,20 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink } from "@/components/NavLink";
-import { Wallet, LayoutDashboard, LogOut, Shield } from "lucide-react";
+import { Wallet, LayoutDashboard, LogOut, Shield, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { logout, isAuthenticated, getAuthSession } from "@/utils/wifAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
 interface LayoutProps {
   children: ReactNode;
 }
@@ -15,6 +24,8 @@ const Layout = ({ children }: LayoutProps) => {
   const { toast } = useToast();
   const authenticated = isAuthenticated();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -48,8 +59,56 @@ const Layout = ({ children }: LayoutProps) => {
       description: "You have been successfully logged out",
     });
     navigate("/login");
+    setSheetOpen(false);
   };
-  return <div className="min-h-screen bg-background">
+
+  const navLinks = (
+    <>
+      <NavLink
+        to="/dashboard"
+        className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        activeClassName="bg-secondary text-foreground"
+        onClick={() => setSheetOpen(false)}
+      >
+        <LayoutDashboard className="h-4 w-4" />
+        Dashboard
+      </NavLink>
+      <NavLink
+        to="/wallets"
+        className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        activeClassName="bg-secondary text-foreground"
+        onClick={() => setSheetOpen(false)}
+      >
+        <Wallet className="h-4 w-4" />
+        Wallets
+      </NavLink>
+      {isAdmin && (
+        <NavLink
+          to="/admin"
+          className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+          activeClassName="bg-red-700 text-white"
+          onClick={() => setSheetOpen(false)}
+        >
+          <Shield className="h-4 w-4" />
+          Admin
+        </NavLink>
+      )}
+      {authenticated && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-sm font-medium justify-start"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
+      )}
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
       <nav className="border-b border-border bg-card">
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
@@ -57,39 +116,42 @@ const Layout = ({ children }: LayoutProps) => {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
                 <span className="text-lg font-bold text-primary-foreground">L</span>
               </div>
-              <span className="text-xl font-semibold text-foreground">Decentralised Lana Register</span>
+              <span className="text-xl font-semibold text-foreground hidden sm:inline">
+                Decentralised Lana Register
+              </span>
+              <span className="text-xl font-semibold text-foreground sm:hidden">
+                DLR
+              </span>
             </div>
-            <div className="flex gap-1">
-              <NavLink to="/dashboard" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" activeClassName="bg-secondary text-foreground">
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </NavLink>
-              <NavLink to="/wallets" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" activeClassName="bg-secondary text-foreground">
-                <Wallet className="h-4 w-4" />
-                Wallets
-              </NavLink>
-              {isAdmin && (
-                <NavLink to="/admin" className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700" activeClassName="bg-red-700 text-white">
-                  <Shield className="h-4 w-4" />
-                  Admin
-                </NavLink>
-              )}
-              {authenticated && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 text-sm font-medium"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Button>
-              )}
+
+            {/* Desktop nav */}
+            <div className="hidden md:flex gap-1">
+              {navLinks}
             </div>
+
+            {/* Mobile hamburger */}
+            {isMobile && (
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-64">
+                  <SheetHeader>
+                    <SheetTitle>Menu</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6 flex flex-col gap-2">
+                    {navLinks}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
           </div>
         </div>
       </nav>
-      <main className="container mx-auto px-4 py-8">{children}</main>
-    </div>;
+      <main className="container mx-auto px-4 py-6 md:py-8">{children}</main>
+    </div>
+  );
 };
 export default Layout;
