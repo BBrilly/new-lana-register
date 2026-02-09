@@ -18,6 +18,7 @@ import { QrCode, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { validateLanaAddress } from "@/utils/walletValidation";
+import { getAuthSession } from "@/utils/wifAuth";
 
 const AddWallet = () => {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ const AddWallet = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isValid, setIsValid] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerDivRef = useRef<HTMLDivElement>(null);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -201,10 +203,39 @@ const AddWallet = () => {
       return;
     }
 
-    // TODO: Implement add wallet via Supabase
-    console.log("Nova denarnica:", { walletNumber, type, description });
-    toast.success("Wallet will be added (functionality coming soon)");
-    navigate("/wallets");
+    const session = getAuthSession();
+    if (!session) {
+      toast.error("You must be logged in to add a wallet");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("register-virgin-wallets", {
+        body: {
+          method: "register_virgin_wallets_for_existing_user",
+          api_key: "lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe",
+          data: {
+            nostr_id_hex: session.nostrHexId,
+            wallets: [{
+              wallet_id: walletNumber,
+              wallet_type: type,
+              notes: description
+            }]
+          }
+        }
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Registration failed");
+
+      toast.success("Wallet successfully registered!");
+      navigate("/wallets");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to register wallet");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const startScanning = async () => {
@@ -398,10 +429,11 @@ const AddWallet = () => {
             </Button>
             <Button 
               type="submit" 
-              disabled={isScanning || !isValid || isValidating}
+              disabled={isScanning || !isValid || isValidating || isSubmitting}
               className={isValid && !isValidating ? "bg-green-600 hover:bg-green-700" : ""}
             >
-              Add Wallet
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Registering..." : "Add Wallet"}
             </Button>
           </div>
         </form>
