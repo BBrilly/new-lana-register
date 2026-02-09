@@ -1,53 +1,48 @@
 
 
-# Brisanje denarnic z dvojno potrditvijo in Nostr KIND 30889
+# Fix: delete-wallet broadcasts to wrong relays
 
-## Kaj se bo spremenilo
+## Problem
 
-### 1. Nova edge funkcija: `delete-wallet`
-Ustvari novo edge funkcijo `supabase/functions/delete-wallet/index.ts`, ki:
-- Sprejme `wallet_id` (UUID) in `api_key` (registrarjev kljuc)
-- Preveri, da denarnica obstaja in da tip NI "Main Wallet", "Main", "Lana8Wonder" ali "Knights"/"LanaKnights"
-- Prebere trenutni balance denarnice preko `fetch-wallet-balance`
-- Zbrise denarnico iz tabele `wallets`
-- Vstavi zapis v tabelo `deleted_wallets` z vsemi podatki (wallet_id, wallet_type, nostr_hex_id, reason, balance ob brisanju)
-- Prebere vse preostale denarnice za tega uporabnika
-- Podpise in objavi nov KIND 30889 event z posodobljenim seznamom denarnic (brez izbrisane) -- enaka logika kot v `register-virgin-wallets` (vrstice 522-549)
+The `delete-wallet` edge function reads relays from the database but parses them incorrectly compared to `register-virgin-wallets`.
 
-### 2. Sprememba WalletCard komponente (`src/components/WalletCard.tsx`)
-- Skrij gumb za brisanje (Trash2 ikona) za denarnice tipa Main, Lana8Wonder in Knights
-- Ob kliku na gumb za brisanje odpri **prvi dialog** z opozorilom: "Ali ste prepricani, da zelite zbrisati to denarnico?"
-- Po prvi potrditvi odpri **drugi dialog** z besedilom: "To dejanje je nepovratno. Denarnica bo odstranjena iz registra. Potrdite brisanje." -- uporabnik mora klikniti "Da, zbrisi"
-- Po drugi potrditvi poklice edge funkcijo `delete-wallet`
-- Prikaze toast ob uspehu ali napaki
-- Ob uspehu odstrani kartico iz prikaza (callback na parent)
+**Database stores:** a flat array: `["wss://relay.lanavault.space", "wss://relay.lanacoin-eternity.com", ...]`
 
-### 3. Sprememba Wallets strani (`src/pages/Wallets.tsx`)
-- Posodobi `handleDeleteWallet` da dejansko poklice edge funkcijo in refresha seznam denarnic
+**register-virgin-wallets (works):**
+```
+const relays = (systemParams.relays as any[]).map((r: any) => r.url || r);
+```
+Correctly gets the 5 LANA relays.
 
-## Tehnicni detajli
+**delete-wallet (broken):**
+```
+const relays = (systemParams?.relays as any)?.relays || [fallbacks];
+```
+Tries to access `.relays` inside the already-flat array, gets `undefined`, falls back to `relay.damus.io`, `nos.lol`, `relay.nostr.band` -- generic relays that have nothing to do with LANA. The event IS published there (logs show 2/3 accepted) but nobody checks those relays for KIND 30889.
 
-### Edge funkcija `delete-wallet`
-- Metoda: POST
-- Body: `{ api_key, wallet_uuid, nostr_id_hex }`
-- Validacija: preveri tip denarnice, preveri da pripada danemu nostr_id_hex
-- Brisanje iz `wallets` tabele (service role key)
-- Insert v `deleted_wallets` z razlogom "user_requested" in balanceom
-- Fetch vseh preostalih walletov za main_wallet
-- Podpis in objava KIND 30889 eventa z novim seznamom (brez izbrisane denarnice)
-- Uporabi `nostr_registrar_nsec` iz `app_settings` za podpis (enako kot register-virgin-wallets)
+## Fix
 
-### WalletCard spremembe
-- Dodaj dva AlertDialog-a za dvojno potrditev
-- Logika za skrivanje delete gumba:
-  ```
-  const canDelete = !["main", "lana8wonder", "knights", "lanaknights"].some(
-    t => wallet.type.toLowerCase().includes(t)
-  );
-  ```
-- Ce `canDelete` je false, se Trash2 ikona sploh ne prikaze
-- Dodaj `isDeleting` state za loading indikator med brisanjem
+One-line change in `supabase/functions/delete-wallet/index.ts` line 180:
 
-### config.toml
-- Dodaj zapis za novo edge funkcijo z `verify_jwt = false`
+Replace:
+```
+const relays = (systemParams?.relays as any)?.relays || [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.nostr.band",
+];
+```
+
+With:
+```
+const relays = (systemParams?.relays as any[])?.map((r: any) => r.url || r) || [
+  "wss://relay.lanavault.space",
+  "wss://relay.lanacoin-eternity.com",
+  "wss://relay.lanaheartvoice.com",
+  "wss://relay.lovelana.org",
+  "wss://relay.damus.io",
+];
+```
+
+This matches the exact pattern used in `register-virgin-wallets` and sends the KIND 30889 event to the correct LANA relays.
 
