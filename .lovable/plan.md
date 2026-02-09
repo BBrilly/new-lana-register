@@ -1,108 +1,70 @@
 
-# API Documentation Page Implementation
+# Popravek: API Key validacija v register-virgin-wallets
 
-## Overview
-Creating a comprehensive API documentation page for the Lana Register external APIs, accessible via an "API Docs" link in the landing page header.
+## Problem
 
-## What Will Be Built
+Edge funkcija `register-virgin-wallets` preverja API kljuc v napacni tabeli. Trenutno isce kljuc v tabeli `app_settings` pod kljucem `registrar_api_key`, ki pa ne obstaja. Dejanski API kljuci so shranjeni v tabeli `api_keys`.
 
-### 1. New API Documentation Page (`/api-docs`)
-A clean, professional documentation page covering the external APIs:
+Ko poklices API s kljucem `ak_2phlibhnmhnqoie2hugf0h`, funkcija ne najde nastavitve v `app_settings` in vrne napako "API key configuration not found".
 
-- **Register Virgin Wallets API** - Bulk registration of zero-balance wallets for existing users
-- Authentication requirements (API key)
-- Request/response formats with examples
-- Error codes and handling
-- Link to official website lanawatch.us
+## Resitev
 
-### 2. Landing Page Header Update
-Adding an "API Docs" navigation link in the landing page header, styled to match the existing design.
+Spremenil bom validacijo API kljuca v edge funkciji, da bo preverjala tabelo `api_keys` namesto `app_settings`.
 
-## Technical Details
+## Tehnicni detajli
 
-### Files to Create
+**Datoteka:** `supabase/functions/register-virgin-wallets/index.ts`
 
-**`src/pages/ApiDocs.tsx`**
-- Complete API documentation page with sections:
-  - Introduction & Overview
-  - Authentication (API key requirement)
-  - Endpoints documentation
-  - Request/Response examples
-  - Error codes reference
-  - Link to lanawatch.us
+Trenutna (napacna) logika na vrsticah 152-185:
+- Isce `registrar_api_key` v tabeli `app_settings`
+- Primerja poslan kljuc z najdeno vrednostjo
 
-### Files to Modify
+Nova logika:
+- Poisca poslan `api_key` v tabeli `api_keys` (stolpec `api_key`)
+- Preveri, da je kljuc aktiven (`is_active = true`)
+- Preveri rate limiting (`rate_limit_per_hour` in `request_count_current_hour`)
+- Posodobi `last_request_at` in `request_count_current_hour` ob uspesni uporabi
 
-**`src/pages/LandingPage.tsx`**
-- Add "API Docs" link to the header navigation (near existing elements like status indicators)
+```typescript
+// Step 1: Validate API Key against api_keys table
+const { data: apiKeyRecord, error: apiKeyError } = await supabase
+  .from("api_keys")
+  .select("id, api_key, is_active, rate_limit_per_hour, request_count_current_hour")
+  .eq("api_key", body.api_key)
+  .maybeSingle();
 
-**`src/App.tsx`**
-- Add new route: `/api-docs` pointing to ApiDocs component
-
-## API Documentation Content
-
-### Register Virgin Wallets Endpoint
-
-```text
-POST /functions/v1/register-virgin-wallets
-
-Purpose: Bulk register up to 8 zero-balance (virgin) wallets 
-         for an existing user profile
-
-Authentication: API key in request body
-
-Request Body:
-{
-  "method": "register_virgin_wallets_for_existing_user",
-  "api_key": "your_api_key",
-  "data": {
-    "nostr_id_hex": "64-char-hex-string",
-    "wallets": [
-      {
-        "wallet_id": "LxxxxxxxxxxxxxxxxxxxxxxxxL",
-        "wallet_type": "Main Wallet",
-        "notes": "Optional note"
-      }
-    ]
-  }
+if (apiKeyError || !apiKeyRecord) {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      status: "unauthorized",
+      error: "Invalid API key",
+      correlation_id: correlationId
+    }),
+    { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 
-Response (Success):
-{
-  "success": true,
-  "status": "ok",
-  "message": "Successfully registered X virgin wallets",
-  "data": {
-    "nostr_id_hex": "...",
-    "wallets_registered": X,
-    "wallets": [...],
-    "nostr_broadcasts": {
-      "successful": X,
-      "failed": 0
-    }
-  },
-  "correlation_id": "uuid"
+if (!apiKeyRecord.is_active) {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      status: "unauthorized",
+      error: "API key is deactivated",
+      correlation_id: correlationId
+    }),
+    { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
+
+// Update usage tracking
+await supabase
+  .from("api_keys")
+  .update({
+    last_request_at: new Date().toISOString(),
+    request_count_current_hour: (apiKeyRecord.request_count_current_hour || 0) + 1
+  })
+  .eq("id", apiKeyRecord.id);
 ```
 
-### Error Codes
-- `400` - Invalid request (bad method, invalid wallet format, non-virgin wallet)
-- `401` - Invalid API key
-- `404` - Profile not found for given nostr_id_hex
-- `409` - Duplicate wallet registration
-- `500` - Server error
-
-## Design Approach
-
-The API docs page will:
-- Use existing UI components (Card, Badge, Table)
-- Match the dark theme of the application
-- Include code blocks with syntax highlighting for examples
-- Provide copy-to-clipboard functionality for code snippets
-- Link prominently to lanawatch.us as the official website
-
-## Implementation Order
-
-1. Create `ApiDocs.tsx` page component
-2. Add route in `App.tsx`
-3. Add "API Docs" link to `LandingPage.tsx` header
+To je edina sprememba - ostala logika funkcije ostane nespremenjena.
