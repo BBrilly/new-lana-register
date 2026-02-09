@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SimplePool, finalizeEvent, getPublicKey } from "https://esm.sh/nostr-tools@2.7.0";
+import { SimplePool, finalizeEvent, getPublicKey, nip19 } from "https://esm.sh/nostr-tools@2.7.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,33 +48,12 @@ function isValidNostrHex(hexId: string): boolean {
          /^[a-fA-F0-9]+$/.test(hexId);
 }
 
-// Decode nsec to hex private key
+// Decode nsec to hex private key using nostr-tools
 function decodeNsec(nsec: string): string {
-  const ALPHABET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-  const data = nsec.slice(5); // Remove 'nsec1' prefix
-  const decoded: number[] = [];
-  
-  for (const char of data) {
-    const index = ALPHABET.indexOf(char);
-    if (index === -1) throw new Error("Invalid bech32 character");
-    decoded.push(index);
-  }
-  
-  // Convert 5-bit to 8-bit
-  let acc = 0;
-  let bits = 0;
-  const result: number[] = [];
-  
-  for (const value of decoded) {
-    acc = (acc << 5) | value;
-    bits += 5;
-    while (bits >= 8) {
-      bits -= 8;
-      result.push((acc >> bits) & 0xff);
-    }
-  }
-  
-  return result.map(b => b.toString(16).padStart(2, "0")).join("");
+  const { type, data } = nip19.decode(nsec);
+  if (type !== "nsec") throw new Error("Expected nsec key");
+  // data is a Uint8Array of 32 bytes
+  return Array.from(data as Uint8Array).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Create and sign a Nostr event
