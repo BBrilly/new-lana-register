@@ -9,7 +9,10 @@ export const useUserWallets = () => {
   const [walletIds, setWalletIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { balances, fxRates, userCurrency, isLoading: isLoadingBalances } = useWalletBalances(walletIds);
+
+  const refetch = () => setRefreshKey(k => k + 1);
 
   useEffect(() => {
     const fetchWallets = async () => {
@@ -121,7 +124,7 @@ export const useUserWallets = () => {
     };
 
     fetchWallets();
-  }, []);
+  }, [refreshKey]);
 
   // Update wallet balances when balances are loaded
   useEffect(() => {
@@ -141,5 +144,5 @@ export const useUserWallets = () => {
     }
   }, [balances, fxRates, userCurrency]);
 
-  return { wallets, isLoading: isLoading || isLoadingBalances, error, fxRates, userCurrency };
+  return { wallets, isLoading: isLoading || isLoadingBalances, error, fxRates, userCurrency, refetch };
 };

@@ -8,17 +8,23 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WalletNostrEvents from "./WalletNostrEvents";
+import WalletDeleteDialog from "./WalletDeleteDialog";
 
 interface WalletCardProps {
   wallet: Wallet;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
   userCurrency: string;
   fxRates: { EUR: number; GBP: number; USD: number } | null;
 }
 
 const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps) => {
   const [copied, setCopied] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
+
+  const canDelete = !["main", "lana8wonder", "knights", "lanaknights"].some(
+    t => wallet.type.toLowerCase().includes(t)
+  );
 
   const getCurrencySymbol = (currency: string) => {
     switch (currency) {
@@ -137,14 +143,16 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
               <ExternalLink className="h-4 w-4" />
               Transactions
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onDelete(wallet.id)}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -234,6 +242,19 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
         {/* Nostr Kind 87003 Events */}
         <WalletNostrEvents walletAddress={wallet.walletNumber} walletUuid={wallet.id} />
       </div>
+
+      {canDelete && (
+        <WalletDeleteDialog
+          walletType={wallet.type}
+          walletNumber={wallet.walletNumber}
+          isOpen={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirmDelete={async () => {
+            await onDelete(wallet.id);
+            setShowDeleteDialog(false);
+          }}
+        />
+      )}
     </Card>
   );
 };

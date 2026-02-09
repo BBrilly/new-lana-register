@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.monthly-subscription-proposals]
 verify_jwt = false
+
+[functions.delete-wallet]
+verify_jwt = false
