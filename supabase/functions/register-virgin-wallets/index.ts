@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SimplePool, finalizeEvent, getPublicKey, nip19 } from "https://esm.sh/nostr-tools@2.7.0";
+import { SimplePool, finalizeEvent, getPublicKey } from "https://esm.sh/nostr-tools@2.7.0";
+import { decode as nip19decode } from "https://esm.sh/nostr-tools@2.7.0/nip19";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,9 +49,9 @@ function isValidNostrHex(hexId: string): boolean {
          /^[a-fA-F0-9]+$/.test(hexId);
 }
 
-// Decode nsec to hex private key using nostr-tools
+// Decode nsec to hex private key using nostr-tools nip19
 function decodeNsec(nsec: string): string {
-  const { type, data } = nip19.decode(nsec);
+  const { type, data } = nip19decode(nsec);
   if (type !== "nsec") throw new Error("Expected nsec key");
   // data is a Uint8Array of 32 bytes
   return Array.from(data as Uint8Array).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -77,18 +78,36 @@ function createSignedEvent(
   return finalizeEvent(event, privateKeyBytes);
 }
 
-// Broadcast event to relays
+// Broadcast event to relays with detailed logging
 async function broadcastToRelays(
   pool: SimplePool,
   relays: string[],
-  event: any
-): Promise<{ success: boolean; eventId: string }> {
+  event: any,
+  correlationId: string
+): Promise<{ success: boolean; eventId: string; acceptedRelays: number; failedRelays: number }> {
   try {
-    await Promise.any(pool.publish(relays, event));
-    return { success: true, eventId: event.id };
+    const promises = pool.publish(relays, event);
+    const results = await Promise.allSettled(promises);
+    
+    let accepted = 0;
+    let failed = 0;
+    
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === "fulfilled") {
+        accepted++;
+      } else {
+        failed++;
+        console.warn(`[${correlationId}] Relay ${relays[i]} rejected KIND ${event.kind}: ${result.reason}`);
+      }
+    }
+    
+    console.log(`[${correlationId}] KIND ${event.kind} (${event.id.substring(0, 12)}): ${accepted}/${relays.length} relays accepted`);
+    
+    return { success: accepted > 0, eventId: event.id, acceptedRelays: accepted, failedRelays: failed };
   } catch (error) {
-    console.error("Failed to broadcast event:", error);
-    return { success: false, eventId: event.id };
+    console.error(`[${correlationId}] Failed to broadcast KIND ${event.kind}:`, error);
+    return { success: false, eventId: event.id, acceptedRelays: 0, failedRelays: relays.length };
   }
 }
 
@@ -424,6 +443,9 @@ Deno.serve(async (req) => {
         new Uint8Array(privateKeyHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)))
       );
 
+      console.log(`[${correlationId}] NSEC decoded OK, privkey length: ${privateKeyHex.length} chars, registrar pubkey: ${registrarPubkey.substring(0, 12)}...`);
+      console.log(`[${correlationId}] Broadcasting to relays: ${JSON.stringify(relays)}`);
+
       const timestamp = new Date().toISOString();
 
       try {
@@ -438,6 +460,7 @@ Deno.serve(async (req) => {
 
           try {
             // KIND 87006 - Virgin Wallet Confirmation
+            console.log(`[${correlationId}] Creating KIND 87006 for wallet ${wallet.wallet_id}`);
             const event87006 = createSignedEvent(
               87006,
               [
@@ -451,13 +474,15 @@ Deno.serve(async (req) => {
               `Wallet ${wallet.wallet_id} verified as virgin (balance: 0)`,
               privateKeyHex
             );
+            console.log(`[${correlationId}] KIND 87006 event created: ${event87006.id.substring(0, 12)}, pubkey: ${event87006.pubkey.substring(0, 12)}`);
 
-            const result87006 = await broadcastToRelays(pool, relays, event87006);
+            const result87006 = await broadcastToRelays(pool, relays, event87006, correlationId);
             if (result87006.success) {
               walletResult.nostr_event_ids!.kind_87006 = result87006.eventId;
             }
 
             // KIND 87002 - Registration Confirmation
+            console.log(`[${correlationId}] Creating KIND 87002 for wallet ${wallet.wallet_id}`);
             const event87002 = createSignedEvent(
               87002,
               [
@@ -475,8 +500,9 @@ Deno.serve(async (req) => {
               `Wallet ${wallet.wallet_id} registered via bulk virgin registration`,
               privateKeyHex
             );
+            console.log(`[${correlationId}] KIND 87002 event created: ${event87002.id.substring(0, 12)}, pubkey: ${event87002.pubkey.substring(0, 12)}`);
 
-            const result87002 = await broadcastToRelays(pool, relays, event87002);
+            const result87002 = await broadcastToRelays(pool, relays, event87002, correlationId);
             if (result87002.success) {
               walletResult.nostr_event_ids!.kind_87002 = result87002.eventId;
               successfulBroadcasts++;
@@ -503,6 +529,7 @@ Deno.serve(async (req) => {
           ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0"]
         );
 
+        console.log(`[${correlationId}] Creating KIND 30889 with ${walletTags.length} wallet tags`);
         const event30889 = createSignedEvent(
           30889,
           [
@@ -514,9 +541,11 @@ Deno.serve(async (req) => {
           privateKeyHex
         );
 
-        await broadcastToRelays(pool, relays, event30889);
-        console.log(`[${correlationId}] Published KIND 30889 with ${walletTags.length} wallets`);
+        const result30889 = await broadcastToRelays(pool, relays, event30889, correlationId);
+        console.log(`[${correlationId}] KIND 30889 broadcast result: ${result30889.acceptedRelays}/${relays.length} relays accepted`);
 
+        // Give pool time to flush pending writes before closing
+        await new Promise(resolve => setTimeout(resolve, 1000));
         pool.close(relays);
       } catch (error) {
         console.error(`[${correlationId}] Error in Nostr broadcasting:`, error);
