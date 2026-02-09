@@ -56,15 +56,15 @@ const WalletDeleteDialog = ({
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Ali ste prepričani?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Ali ste prepričani, da želite zbrisati denarnico <strong>{walletType}</strong> ({walletNumber})?
+              Are you sure you want to delete wallet <strong>{walletType}</strong> ({walletNumber})?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancel}>Prekliči</AlertDialogCancel>
+            <AlertDialogCancel onClick={handleCancel}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleFirstConfirm}>
-              Da, nadaljuj
+              Yes, continue
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -76,14 +76,14 @@ const WalletDeleteDialog = ({
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">Končna potrditev</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">Final confirmation</AlertDialogTitle>
             <AlertDialogDescription>
-              To dejanje je <strong>nepovratno</strong>. Denarnica bo odstranjena iz registra in objavljen bo posodobljen KIND 30889 event. Potrdite brisanje.
+              This action is <strong>irreversible</strong>. The wallet will be removed from the registry and an updated KIND 30889 event will be published. Confirm deletion.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleCancel} disabled={isDeleting}>
-              Prekliči
+              Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSecondConfirm}
@@ -93,10 +93,10 @@ const WalletDeleteDialog = ({
               {isDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Brišem...
+                  Deleting...
                 </>
               ) : (
-                "Da, zbriši"
+                "Yes, delete"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
