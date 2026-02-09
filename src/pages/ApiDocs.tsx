@@ -126,6 +126,24 @@ const ApiDocs = () => {
             External API for integrating with the Lana Register system. Register virgin wallets for existing users 
             and broadcast registration events to the Nostr network.
           </p>
+          <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
+            <h3 className="text-sm font-medium text-muted-foreground mb-1">Base URL</h3>
+            <div className="flex items-center gap-2">
+              <code className="text-lg font-mono text-foreground">https://laluxmwarlejdwyboudz.supabase.co</code>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copyToClipboard('https://laluxmwarlejdwyboudz.supabase.co', 'baseurl')}
+                className="h-7 gap-1"
+              >
+                {copiedSection === 'baseurl' ? (
+                  <><Check className="h-3 w-3" /> Copied</>
+                ) : (
+                  <><Copy className="h-3 w-3" /> Copy</>
+                )}
+              </Button>
+            </div>
+          </div>
           <div className="mt-4 flex items-center gap-2">
             <Badge variant="secondary" className="gap-1">
               <BookOpen className="h-3 w-3" />
@@ -392,7 +410,15 @@ const ApiDocs = () => {
                 <TableRow>
                   <TableCell><Badge variant="outline">400</Badge></TableCell>
                   <TableCell className="font-medium">Bad Request</TableCell>
-                  <TableCell className="text-muted-foreground">Invalid method, wallet format, or non-virgin wallet (balance {'>'} 0)</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Invalid method (not "register_virgin_wallets_for_existing_user")</li>
+                      <li>Invalid nostr_id_hex format (not 64-char hex)</li>
+                      <li>Invalid wallet count (must be 1-8)</li>
+                      <li>Invalid wallet address format (must start with 'L', 26-35 chars, alphanumeric)</li>
+                      <li>Non-virgin wallet detected (balance {'>'} 0)</li>
+                    </ul>
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell><Badge variant="outline">401</Badge></TableCell>
@@ -407,12 +433,20 @@ const ApiDocs = () => {
                 <TableRow>
                   <TableCell><Badge variant="outline">409</Badge></TableCell>
                   <TableCell className="font-medium">Conflict</TableCell>
-                  <TableCell className="text-muted-foreground">One or more wallets are already registered</TableCell>
+                  <TableCell className="text-muted-foreground">One or more wallets are already registered in the system</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell><Badge variant="outline">500</Badge></TableCell>
                   <TableCell className="font-medium">Server Error</TableCell>
-                  <TableCell className="text-muted-foreground">Internal server error or configuration issue</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>API key configuration not found on server</li>
+                      <li>System parameters not available</li>
+                      <li>Failed to validate wallet balances (Electrum server issue)</li>
+                      <li>Database error during registration</li>
+                      <li>Unexpected internal error</li>
+                    </ul>
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
