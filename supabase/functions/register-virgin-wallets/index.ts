@@ -149,27 +149,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 1: Validate API Key
-    const { data: apiKeySetting, error: apiKeyError } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "registrar_api_key")
+    // Step 1: Validate API Key against api_keys table
+    const { data: apiKeyRecord, error: apiKeyError } = await supabase
+      .from("api_keys")
+      .select("id, api_key, is_active, rate_limit_per_hour, request_count_current_hour")
+      .eq("api_key", body.api_key)
       .maybeSingle();
 
-    if (apiKeyError || !apiKeySetting) {
-      console.error(`[${correlationId}] API key setting not found:`, apiKeyError);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          status: "error",
-          error: "API key configuration not found",
-          correlation_id: correlationId
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (body.api_key !== apiKeySetting.value) {
+    if (apiKeyError || !apiKeyRecord) {
       console.log(`[${correlationId}] Invalid API key provided`);
       return new Response(
         JSON.stringify({
@@ -181,6 +168,28 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (!apiKeyRecord.is_active) {
+      console.log(`[${correlationId}] API key is deactivated`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: "unauthorized",
+          error: "API key is deactivated",
+          correlation_id: correlationId
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Update usage tracking
+    await supabase
+      .from("api_keys")
+      .update({
+        last_request_at: new Date().toISOString(),
+        request_count_current_hour: (apiKeyRecord.request_count_current_hour || 0) + 1
+      })
+      .eq("id", apiKeyRecord.id);
 
     // Step 2: Validate input data
     const { nostr_id_hex, wallets } = body.data;
