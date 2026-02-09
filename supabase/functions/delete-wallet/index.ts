@@ -177,10 +177,12 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-        const relays = (systemParams?.relays as any)?.relays || [
+        const relays = (systemParams?.relays as any[])?.map((r: any) => r.url || r) || [
+          "wss://relay.lanavault.space",
+          "wss://relay.lanacoin-eternity.com",
+          "wss://relay.lanaheartvoice.com",
+          "wss://relay.lovelana.org",
           "wss://relay.damus.io",
-          "wss://nos.lol",
-          "wss://relay.nostr.band",
         ];
 
         // Get remaining wallets
