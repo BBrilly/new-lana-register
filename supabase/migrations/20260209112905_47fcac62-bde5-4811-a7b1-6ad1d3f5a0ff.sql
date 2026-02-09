@@ -1,0 +1,1 @@
+ALTER TABLE public.api_keys DROP COLUMN can_register_lana;

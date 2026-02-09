@@ -19,7 +19,6 @@ interface ApiKey {
   service_name: string;
   contact_info: string | null;
   api_key: string;
-  can_register_lana: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -32,7 +31,6 @@ interface ApiKeyFormData {
   service_name: string;
   contact_info: string;
   api_key: string;
-  can_register_lana: boolean;
   is_active: boolean;
   rate_limit_per_hour: number;
 }
@@ -55,7 +53,6 @@ const ApiKeysManager = () => {
     service_name: "",
     contact_info: "",
     api_key: "",
-    can_register_lana: false,
     is_active: true,
     rate_limit_per_hour: 100,
   });
@@ -79,7 +76,6 @@ const ApiKeysManager = () => {
         service_name: data.service_name,
         contact_info: data.contact_info || null,
         api_key: data.api_key,
-        can_register_lana: data.can_register_lana,
         is_active: data.is_active,
         rate_limit_per_hour: data.rate_limit_per_hour,
       });
@@ -103,7 +99,6 @@ const ApiKeysManager = () => {
         .update({
           service_name: data.service_name,
           contact_info: data.contact_info || null,
-          can_register_lana: data.can_register_lana,
           is_active: data.is_active,
           rate_limit_per_hour: data.rate_limit_per_hour,
         })
@@ -140,7 +135,6 @@ const ApiKeysManager = () => {
       service_name: "",
       contact_info: "",
       api_key: "",
-      can_register_lana: false,
       is_active: true,
       rate_limit_per_hour: 100,
     });
@@ -158,7 +152,6 @@ const ApiKeysManager = () => {
       service_name: apiKey.service_name,
       contact_info: apiKey.contact_info || "",
       api_key: apiKey.api_key,
-      can_register_lana: apiKey.can_register_lana,
       is_active: apiKey.is_active,
       rate_limit_per_hour: apiKey.rate_limit_per_hour,
     });
@@ -273,14 +266,6 @@ const ApiKeysManager = () => {
                 />
               </div>
               <div className="flex items-center justify-between">
-                <Label htmlFor="can_register_lana">Lahko registrira Lana</Label>
-                <Switch
-                  id="can_register_lana"
-                  checked={formData.can_register_lana}
-                  onCheckedChange={(checked) => setFormData({ ...formData, can_register_lana: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
                 <Label htmlFor="is_active">Aktiven</Label>
                 <Switch
                   id="is_active"
@@ -317,7 +302,6 @@ const ApiKeysManager = () => {
                   <TableHead>Storitev</TableHead>
                   <TableHead>API Ključ</TableHead>
                   <TableHead>Kontakt</TableHead>
-                  <TableHead className="text-center">Registracija</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Rate Limit</TableHead>
                   <TableHead>Ustvarjen</TableHead>
@@ -353,13 +337,6 @@ const ApiKeysManager = () => {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {apiKey.contact_info || "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {apiKey.can_register_lana ? (
-                        <span className="text-green-500">Da</span>
-                      ) : (
-                        <span className="text-muted-foreground">Ne</span>
-                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {apiKey.is_active ? (
@@ -432,14 +409,6 @@ const ApiKeysManager = () => {
                                   onChange={(e) =>
                                     setFormData({ ...formData, rate_limit_per_hour: parseInt(e.target.value) || 100 })
                                   }
-                                />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <Label htmlFor="edit_can_register_lana">Lahko registrira Lana</Label>
-                                <Switch
-                                  id="edit_can_register_lana"
-                                  checked={formData.can_register_lana}
-                                  onCheckedChange={(checked) => setFormData({ ...formData, can_register_lana: checked })}
                                 />
                               </div>
                               <div className="flex items-center justify-between">
