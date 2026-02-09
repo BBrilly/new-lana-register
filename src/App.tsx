@@ -11,6 +11,7 @@ import WalletConsolidate from "./pages/WalletConsolidate";
 import SendToRegister from "./pages/SendToRegister";
 import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
+import ApiDocs from "./pages/ApiDocs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/wallets/:walletId/consolidate" element={<WalletConsolidate />} />
           <Route path="/send-to-register" element={<SendToRegister />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/api-docs" element={<ApiDocs />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
