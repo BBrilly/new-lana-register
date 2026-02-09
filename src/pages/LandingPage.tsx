@@ -602,7 +602,7 @@ const LandingPage = () => {
               <span className="text-xl font-semibold text-foreground">Lana Register</span>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={() => navigate("/api-docs")}>
                 <Database className="mr-2 h-4 w-4" />
                 API Docs
               </Button>
