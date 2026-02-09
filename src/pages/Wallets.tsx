@@ -34,10 +34,10 @@ const Wallets = () => {
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Deletion failed");
 
-      toast.success("Denarnica uspešno izbrisana");
+      toast.success("Wallet successfully deleted");
       refetch();
     } catch (err: any) {
-      toast.error(err.message || "Napaka pri brisanju denarnice");
+      toast.error(err.message || "Failed to delete wallet");
       throw err;
     }
   };
