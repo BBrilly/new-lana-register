@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,9 +28,13 @@ const WalletDeleteDialog = ({
 }: WalletDeleteDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
+  const transitioning = useRef(false);
 
   const handleFirstConfirm = () => {
+    transitioning.current = true;
     setStep(2);
+    // Reset after React processes the state change
+    setTimeout(() => { transitioning.current = false; }, 50);
   };
 
   const handleSecondConfirm = async () => {
@@ -52,7 +56,7 @@ const WalletDeleteDialog = ({
     <>
       {/* Step 1 */}
       <AlertDialog open={isOpen && step === 1} onOpenChange={(open) => {
-        if (!open) handleCancel();
+        if (!open && !transitioning.current) handleCancel();
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
