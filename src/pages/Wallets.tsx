@@ -7,14 +7,39 @@ import { toast } from "sonner";
 import { useUserWallets } from "@/hooks/useUserWallets";
 import { Skeleton } from "@/components/ui/skeleton";
 import WalletOwnerSearch from "@/components/WalletOwnerSearch";
+import { supabase } from "@/integrations/supabase/client";
+import { getAuthSession } from "@/utils/wifAuth";
+import { useState } from "react";
 
 const Wallets = () => {
   const navigate = useNavigate();
-  const { wallets, isLoading, error, fxRates, userCurrency } = useUserWallets();
+  const { wallets, isLoading, error, fxRates, userCurrency, refetch } = useUserWallets();
 
-  const handleDeleteWallet = (id: string) => {
-    // TODO: Implement delete via Supabase
-    toast.success("Wallet successfully deleted");
+  const handleDeleteWallet = async (id: string) => {
+    const session = getAuthSession();
+    if (!session) {
+      toast.error("You must be logged in to delete a wallet");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-wallet", {
+        body: {
+          api_key: "lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe",
+          wallet_uuid: id,
+          nostr_id_hex: session.nostrHexId,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Deletion failed");
+
+      toast.success("Denarnica uspešno izbrisana");
+      refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Napaka pri brisanju denarnice");
+      throw err;
+    }
   };
 
   return (
