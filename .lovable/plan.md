@@ -1,66 +1,53 @@
 
 
-# Implementacija dodajanja denarnic preko registrar API kljuca
+# Brisanje denarnic z dvojno potrditvijo in Nostr KIND 30889
 
-## Kaj se spremeni
+## Kaj se bo spremenilo
 
-Gumb "Add Wallet" na strani `/wallets/add` bo dejansko poklical edge funkcijo `register-virgin-wallets` z registrarjevim API kljucem `lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe`, tako da bo registracija identična zunanjemu API klicu.
+### 1. Nova edge funkcija: `delete-wallet`
+Ustvari novo edge funkcijo `supabase/functions/delete-wallet/index.ts`, ki:
+- Sprejme `wallet_id` (UUID) in `api_key` (registrarjev kljuc)
+- Preveri, da denarnica obstaja in da tip NI "Main Wallet", "Main", "Lana8Wonder" ali "Knights"/"LanaKnights"
+- Prebere trenutni balance denarnice preko `fetch-wallet-balance`
+- Zbrise denarnico iz tabele `wallets`
+- Vstavi zapis v tabelo `deleted_wallets` z vsemi podatki (wallet_id, wallet_type, nostr_hex_id, reason, balance ob brisanju)
+- Prebere vse preostale denarnice za tega uporabnika
+- Podpise in objavi nov KIND 30889 event z posodobljenim seznamom denarnic (brez izbrisane) -- enaka logika kot v `register-virgin-wallets` (vrstice 522-549)
 
-## Kako bo delovalo
+### 2. Sprememba WalletCard komponente (`src/components/WalletCard.tsx`)
+- Skrij gumb za brisanje (Trash2 ikona) za denarnice tipa Main, Lana8Wonder in Knights
+- Ob kliku na gumb za brisanje odpri **prvi dialog** z opozorilom: "Ali ste prepricani, da zelite zbrisati to denarnico?"
+- Po prvi potrditvi odpri **drugi dialog** z besedilom: "To dejanje je nepovratno. Denarnica bo odstranjena iz registra. Potrdite brisanje." -- uporabnik mora klikniti "Da, zbrisi"
+- Po drugi potrditvi poklice edge funkcijo `delete-wallet`
+- Prikaze toast ob uspehu ali napaki
+- Ob uspehu odstrani kartico iz prikaza (callback na parent)
 
-1. Uporabnik vnese wallet naslov, izbere tip in opis
-2. Validacija preveri strukturo naslova, da ni duplikat, in da je balance 0 (to ze deluje)
-3. Ob kliku "Add Wallet":
-   - Prebere `nostrHexId` prijavljenega uporabnika iz seje
-   - Poklice `register-virgin-wallets` edge funkcijo z registrarjevim kljucem
-   - Prikaze rezultat (uspeh ali napaka)
-   - Ob uspehu preusmeri nazaj na `/wallets`
+### 3. Sprememba Wallets strani (`src/pages/Wallets.tsx`)
+- Posodobi `handleDeleteWallet` da dejansko poklice edge funkcijo in refresha seznam denarnic
 
 ## Tehnicni detajli
 
-**Datoteka:** `src/pages/AddWallet.tsx`
+### Edge funkcija `delete-wallet`
+- Metoda: POST
+- Body: `{ api_key, wallet_uuid, nostr_id_hex }`
+- Validacija: preveri tip denarnice, preveri da pripada danemu nostr_id_hex
+- Brisanje iz `wallets` tabele (service role key)
+- Insert v `deleted_wallets` z razlogom "user_requested" in balanceom
+- Fetch vseh preostalih walletov za main_wallet
+- Podpis in objava KIND 30889 eventa z novim seznamom (brez izbrisane denarnice)
+- Uporabi `nostr_registrar_nsec` iz `app_settings` za podpis (enako kot register-virgin-wallets)
 
-Spremembe:
-- Uvoz `getAuthSession` iz `@/utils/wifAuth`
-- Dodano stanje `isSubmitting` za loading indikator
-- `handleSubmit` zamenja TODO komentar z dejanskim klicem:
+### WalletCard spremembe
+- Dodaj dva AlertDialog-a za dvojno potrditev
+- Logika za skrivanje delete gumba:
+  ```
+  const canDelete = !["main", "lana8wonder", "knights", "lanaknights"].some(
+    t => wallet.type.toLowerCase().includes(t)
+  );
+  ```
+- Ce `canDelete` je false, se Trash2 ikona sploh ne prikaze
+- Dodaj `isDeleting` state za loading indikator med brisanjem
 
-```typescript
-const session = getAuthSession();
-if (!session) {
-  toast.error("You must be logged in to add a wallet");
-  return;
-}
-
-setIsSubmitting(true);
-try {
-  const { data, error } = await supabase.functions.invoke("register-virgin-wallets", {
-    body: {
-      method: "register_virgin_wallets_for_existing_user",
-      api_key: "lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe",
-      data: {
-        nostr_id_hex: session.nostrHexId,
-        wallets: [{
-          wallet_id: walletNumber,
-          wallet_type: type,
-          notes: description
-        }]
-      }
-    }
-  });
-
-  if (error) throw error;
-  if (!data?.success) throw new Error(data?.error || "Registration failed");
-
-  toast.success("Wallet successfully registered!");
-  navigate("/wallets");
-} catch (err) {
-  toast.error(err.message || "Failed to register wallet");
-} finally {
-  setIsSubmitting(false);
-}
-```
-
-- Gumb "Add Wallet" prikaze spinner med posiljanjem in je onemogocen med klicem
-- `isSubmitting` dodan v disable pogoje gumba
+### config.toml
+- Dodaj zapis za novo edge funkcijo z `verify_jwt = false`
 
