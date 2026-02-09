@@ -45,14 +45,14 @@ const Wallets = () => {
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Wallets</h1>
-            <p className="mt-1 text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Wallets</h1>
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
               Manage all your LAN wallets in one place
             </p>
           </div>
-          <Button size="lg" className="gap-2" onClick={() => navigate("/wallets/add")}>
+          <Button size="lg" className="gap-2 w-full sm:w-auto" onClick={() => navigate("/wallets/add")}>
             <Plus className="h-5 w-5" />
             Add Wallet
           </Button>
@@ -83,7 +83,7 @@ const Wallets = () => {
             </div>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             {wallets.map((wallet) => (
               <WalletCard 
                 key={wallet.id} 

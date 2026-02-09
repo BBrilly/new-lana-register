@@ -98,25 +98,25 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
 
   return (
     <Card className={`overflow-hidden transition-all hover:shadow-md ${cardBorderClass}`}>
-      <div className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isMainWallet ? "bg-success/10" : isLana8Wonder ? "bg-orange-500/10" : "bg-primary/10"}`}>
-              <WalletIcon className={`h-6 w-6 ${isMainWallet ? "text-success" : isLana8Wonder ? "text-orange-500" : "text-primary"}`} />
+      <div className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+            <div className={`flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl ${isMainWallet ? "bg-success/10" : isLana8Wonder ? "bg-orange-500/10" : "bg-primary/10"}`}>
+              <WalletIcon className={`h-5 w-5 sm:h-6 sm:w-6 ${isMainWallet ? "text-success" : isLana8Wonder ? "text-orange-500" : "text-primary"}`} />
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-foreground">{wallet.type}</h3>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-semibold text-foreground">{wallet.type}</h3>
                 {isMainWallet && <Badge className="bg-success/10 text-success">Main</Badge>}
                 {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{wallet.description}</p>
               <div className="mt-1 flex items-center gap-2">
-                <p className="font-mono text-xs text-muted-foreground">ID: {wallet.walletNumber}</p>
+                <p className="font-mono text-xs text-muted-foreground truncate">ID: {wallet.walletNumber}</p>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={handleCopy}
                 >
                   {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -124,12 +124,12 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate(`/wallets/${wallet.id}/consolidate`)}
-              className="gap-2"
+              className="gap-2 text-xs sm:text-sm"
             >
               <Package className="h-4 w-4" />
               Consolidate
@@ -138,7 +138,7 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
               variant="outline"
               size="sm"
               onClick={() => window.open(`https://chainz.cryptoid.info/lana/address.dws?${wallet.walletNumber}.htm`, '_blank')}
-              className="gap-2"
+              className="gap-2 text-xs sm:text-sm"
             >
               <ExternalLink className="h-4 w-4" />
               Transactions
