@@ -443,6 +443,8 @@ export type Database = {
           nostr_87003_event_id: string | null
           nostr_87003_published: boolean | null
           nostr_87003_published_at: string | null
+          nostr_dm_event_id: string | null
+          nostr_dm_sent: boolean | null
           nostr_event_id: string | null
           notes: string | null
           return_amount_unregistered_lana: number | null
@@ -458,6 +460,8 @@ export type Database = {
           nostr_87003_event_id?: string | null
           nostr_87003_published?: boolean | null
           nostr_87003_published_at?: string | null
+          nostr_dm_event_id?: string | null
+          nostr_dm_sent?: boolean | null
           nostr_event_id?: string | null
           notes?: string | null
           return_amount_unregistered_lana?: number | null
@@ -473,6 +477,8 @@ export type Database = {
           nostr_87003_event_id?: string | null
           nostr_87003_published?: boolean | null
           nostr_87003_published_at?: string | null
+          nostr_dm_event_id?: string | null
+          nostr_dm_sent?: boolean | null
           nostr_event_id?: string | null
           notes?: string | null
           return_amount_unregistered_lana?: number | null
