@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SimplePool, finalizeEvent } from 'https://esm.sh/nostr-tools@2.7.0';
 import { decode } from 'https://esm.sh/nostr-tools@2.7.0/nip19';
+import { encrypt } from 'https://esm.sh/nostr-tools@2.7.0/nip04';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,7 @@ interface UnregisteredLanaEvent {
   notes: string | null;
   detected_at: string;
   nostr_event_id: string | null;
+  nostr_dm_sent: boolean | null;
 }
 
 interface WalletInfo {
@@ -73,6 +75,23 @@ function lanaToLatoshis(amount: number): string {
   return Math.floor(amount * 100000000).toString();
 }
 
+// Build DM message for unregistered LANA notification
+function buildDmMessage(walletAddress: string, amount: number): string {
+  return `LANA Unregistered Coins Alert
+
+Your wallet ${walletAddress} has received ${amount} LANA from an unregistered source.
+
+These coins need to be regularized through the LANA Registrar. To resolve this:
+
+1. Open the LanaKnight app or visit the Registrar
+2. Send the unregistered amount (${amount} LANA) to the designated return address provided by the Registrar
+3. The Registrar will process your return and re-issue registered coins
+
+Video tutorial: https://youtu.be/NulmUXSZ4cE
+
+Please regularize these coins as soon as possible to maintain your wallet's compliance status.`;
+}
+
 // Publish event to Nostr relays
 async function publishEventToNostr(
   signedEvent: any,
@@ -87,11 +106,7 @@ async function publishEventToNostr(
 
       return new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
-          results.push({
-            relay,
-            success: false,
-            error: 'Connection timeout (10s)',
-          });
+          results.push({ relay, success: false, error: 'Connection timeout (10s)' });
           console.error(`❌ ${relay}: Timeout`);
           resolve();
         }, 10000);
@@ -146,6 +161,43 @@ async function publishEventToNostr(
   }
 }
 
+// Send NIP-04 encrypted DM to a user
+async function sendEncryptedDM(
+  privateKeyHex: string,
+  privateKeyBytes: Uint8Array,
+  recipientPubkey: string,
+  message: string,
+  relays: string[]
+): Promise<{ success: boolean; eventId: string }> {
+  console.log(`💬 Encrypting DM for ${recipientPubkey.substring(0, 12)}...`);
+
+  // Encrypt the message using NIP-04
+  const ciphertext = await encrypt(privateKeyHex, recipientPubkey, message);
+
+  // Create Kind 4 event
+  const dmEvent = {
+    kind: 4,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [['p', recipientPubkey]],
+    content: ciphertext,
+  };
+
+  // Sign and publish
+  const signedDm = finalizeEvent(dmEvent, privateKeyBytes);
+  console.log(`✍️ DM signed: ${signedDm.id}`);
+
+  const { eventId, results } = await publishEventToNostr(signedDm, relays);
+  const success = results.some((r) => r.success);
+
+  if (success) {
+    console.log(`✅ DM sent successfully: ${eventId}`);
+  } else {
+    console.error(`❌ DM failed to publish to any relay`);
+  }
+
+  return { success, eventId };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -171,10 +223,7 @@ Deno.serve(async (req) => {
     if (settingError || !settingData?.value) {
       console.error('❌ Failed to fetch NOSTR private key:', settingError);
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'NOSTR registrar private key not configured in app_settings',
-        }),
+        JSON.stringify({ success: false, error: 'NOSTR registrar private key not configured in app_settings' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -182,10 +231,7 @@ Deno.serve(async (req) => {
     const nsecKey = settingData.value.trim();
     if (!nsecKey || !nsecKey.startsWith('nsec1')) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Invalid NOSTR private key format. Must be nsec1...',
-        }),
+        JSON.stringify({ success: false, error: 'Invalid NOSTR private key format. Must be nsec1...' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -207,10 +253,7 @@ Deno.serve(async (req) => {
     if (sysError || !sysParams?.relays) {
       console.error('❌ Failed to fetch system parameters:', sysError);
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to fetch relay configuration',
-        }),
+        JSON.stringify({ success: false, error: 'Failed to fetch relay configuration' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -218,22 +261,19 @@ Deno.serve(async (req) => {
     const relays = (sysParams.relays as string[]).filter((r: string) => r.startsWith('wss://'));
     console.log(`📡 Using ${relays.length} relays:`, relays);
 
-    // 3. Fetch unpublished unregistered_lana_events
+    // 3. Fetch unpublished unregistered_lana_events (also fetch those needing DM retry)
     console.log('📋 Fetching unpublished unregistered_lana_events...');
     const { data: unpublishedEvents, error: eventsError } = await supabase
       .from('unregistered_lana_events')
-      .select('id, wallet_id, unregistered_amount, notes, detected_at, nostr_event_id')
-      .eq('nostr_87003_published', false)
+      .select('id, wallet_id, unregistered_amount, notes, detected_at, nostr_event_id, nostr_dm_sent')
+      .or('nostr_87003_published.eq.false,nostr_dm_sent.eq.false')
       .order('detected_at', { ascending: true })
-      .limit(50); // Process max 50 at a time
+      .limit(50);
 
     if (eventsError) {
       console.error('❌ Failed to fetch unpublished events:', eventsError);
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to fetch unpublished events',
-        }),
+        JSON.stringify({ success: false, error: 'Failed to fetch unpublished events' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -241,16 +281,12 @@ Deno.serve(async (req) => {
     if (!unpublishedEvents || unpublishedEvents.length === 0) {
       console.log('✅ No unpublished unregistered events to process');
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No unpublished unregistered events to process',
-          processed: 0,
-        }),
+        JSON.stringify({ success: true, message: 'No unpublished unregistered events to process', processed: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`📋 Found ${unpublishedEvents.length} unpublished unregistered events`);
+    console.log(`📋 Found ${unpublishedEvents.length} events to process`);
 
     // 4. Fetch wallet info for all events (including main_wallets.is_owned)
     const walletIds = [...new Set(unpublishedEvents.map((e) => e.wallet_id))];
@@ -266,9 +302,8 @@ Deno.serve(async (req) => {
     const walletMap = new Map<string, WalletInfo>();
     wallets?.forEach((w) => {
       const row = w as WalletRow;
-      // Normalize main_wallets - handle both single object and array from Supabase
-      const mainWallet = Array.isArray(row.main_wallets) 
-        ? row.main_wallets[0] || null 
+      const mainWallet = Array.isArray(row.main_wallets)
+        ? row.main_wallets[0] || null
         : row.main_wallets;
       walletMap.set(w.id, {
         id: row.id,
@@ -293,74 +328,118 @@ Deno.serve(async (req) => {
     // 5. Process each owned event
     let successCount = 0;
     let errorCount = 0;
+    let dmSentCount = 0;
+    let dmFailCount = 0;
     let skippedCount = unpublishedEvents.length - ownedEvents.length;
-    const processedEvents: Array<{ id: string; eventId: string; success: boolean }> = [];
+    const processedEvents: Array<{ id: string; eventId: string; success: boolean; dmSent: boolean }> = [];
 
     for (const event of ownedEvents) {
       try {
         const wallet = walletMap.get(event.wallet_id);
         const walletAddress = wallet?.wallet_id || event.wallet_id;
         const userPubkey = wallet?.main_wallets?.nostr_hex_id || '';
-        
+
         if (!userPubkey) {
           console.warn(`⚠️ No nostr_hex_id found for event ${event.id}, skipping...`);
           skippedCount++;
           continue;
         }
-        
-        // Convert amount to Latoshis
+
         const amountLatoshis = lanaToLatoshis(event.unregistered_amount);
+        let kind87003Published = false;
+        let eventId = '';
 
-        // Create Kind 87003 event with required ["p", pubkey] tag
-        const eventTemplate = {
-          kind: 87003,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['p', userPubkey],
-            ['WalletID', walletAddress],
-            ['Linked_event', event.nostr_event_id || ''],
-            ['UnregistratedAmountLatoshis', amountLatoshis],
-          ],
-          content: 'Unregistered coins detected requiring regularization',
-        };
+        // --- KIND 87003 publish (only if not yet published) ---
+        // Check if already published by looking at existing data
+        const { data: currentEvent } = await supabase
+          .from('unregistered_lana_events')
+          .select('nostr_87003_published')
+          .eq('id', event.id)
+          .single();
 
-        // Sign event
-        const signedEvent = finalizeEvent(eventTemplate, privateKeyBytes);
-        console.log(`✍️ Event signed for wallet ${walletAddress}: ${signedEvent.id}`);
+        const alreadyPublished87003 = currentEvent?.nostr_87003_published === true;
 
-        // Publish to relays
-        const { eventId, results } = await publishEventToNostr(signedEvent, relays);
-        const publishSuccess = results.some((r) => r.success);
+        if (!alreadyPublished87003) {
+          const eventTemplate = {
+            kind: 87003,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [
+              ['p', userPubkey],
+              ['WalletID', walletAddress],
+              ['Linked_event', event.nostr_event_id || ''],
+              ['UnregistratedAmountLatoshis', amountLatoshis],
+            ],
+            content: 'Unregistered coins detected requiring regularization',
+          };
 
-        if (publishSuccess) {
-          // Update database
-          const { error: updateError } = await supabase
-            .from('unregistered_lana_events')
-            .update({
-              nostr_87003_published: true,
-              nostr_87003_event_id: eventId,
-              nostr_87003_published_at: new Date().toISOString(),
-            })
-            .eq('id', event.id);
+          const signedEvent = finalizeEvent(eventTemplate, privateKeyBytes);
+          console.log(`✍️ Event signed for wallet ${walletAddress}: ${signedEvent.id}`);
 
-          if (updateError) {
-            console.error(`❌ Failed to update event ${event.id}:`, updateError);
-            errorCount++;
-          } else {
-            console.log(`✅ Event ${event.id} published and updated`);
+          const publishResult = await publishEventToNostr(signedEvent, relays);
+          eventId = publishResult.eventId;
+          kind87003Published = publishResult.results.some((r) => r.success);
+
+          if (kind87003Published) {
+            await supabase
+              .from('unregistered_lana_events')
+              .update({
+                nostr_87003_published: true,
+                nostr_87003_event_id: eventId,
+                nostr_87003_published_at: new Date().toISOString(),
+              })
+              .eq('id', event.id);
+
+            console.log(`✅ KIND 87003 published for event ${event.id}`);
             successCount++;
+          } else {
+            console.error(`❌ Failed to publish KIND 87003 for event ${event.id}`);
+            errorCount++;
           }
-
-          processedEvents.push({ id: event.id, eventId, success: true });
         } else {
-          console.error(`❌ Failed to publish event ${event.id} to any relay`);
-          errorCount++;
-          processedEvents.push({ id: event.id, eventId, success: false });
+          kind87003Published = true;
+          console.log(`⏭️ KIND 87003 already published for event ${event.id}`);
         }
+
+        // --- NIP-04 DM (only if 87003 succeeded and DM not yet sent) ---
+        let dmSent = false;
+        if (kind87003Published && !event.nostr_dm_sent) {
+          try {
+            const dmMessage = buildDmMessage(walletAddress, event.unregistered_amount);
+            const dmResult = await sendEncryptedDM(
+              privateKeyHex,
+              privateKeyBytes,
+              userPubkey,
+              dmMessage,
+              relays
+            );
+
+            if (dmResult.success) {
+              await supabase
+                .from('unregistered_lana_events')
+                .update({
+                  nostr_dm_sent: true,
+                  nostr_dm_event_id: dmResult.eventId,
+                })
+                .eq('id', event.id);
+
+              console.log(`✅ DM sent for event ${event.id}`);
+              dmSentCount++;
+              dmSent = true;
+            } else {
+              console.error(`❌ DM failed for event ${event.id}`);
+              dmFailCount++;
+            }
+          } catch (dmError) {
+            console.error(`❌ DM error for event ${event.id}:`, dmError);
+            dmFailCount++;
+          }
+        }
+
+        processedEvents.push({ id: event.id, eventId, success: kind87003Published, dmSent });
       } catch (eventError) {
         console.error(`❌ Error processing event ${event.id}:`, eventError);
         errorCount++;
-        processedEvents.push({ id: event.id, eventId: '', success: false });
+        processedEvents.push({ id: event.id, eventId: '', success: false, dmSent: false });
       }
     }
 
@@ -368,19 +447,21 @@ Deno.serve(async (req) => {
       total: unpublishedEvents.length,
       ownedEvents: ownedEvents.length,
       skipped: skippedCount,
-      success: successCount,
-      errors: errorCount,
+      kind87003_success: successCount,
+      kind87003_errors: errorCount,
+      dm_sent: dmSentCount,
+      dm_failed: dmFailCount,
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${ownedEvents.length} unregistered events (${skippedCount} skipped - not owned)`,
+        message: `Processed ${ownedEvents.length} events (${skippedCount} skipped)`,
         total: unpublishedEvents.length,
         processed: ownedEvents.length,
         skipped: skippedCount,
-        successful: successCount,
-        failed: errorCount,
+        kind87003: { successful: successCount, failed: errorCount },
+        dm: { sent: dmSentCount, failed: dmFailCount },
         events: processedEvents,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -388,10 +469,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Fatal error:', error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
