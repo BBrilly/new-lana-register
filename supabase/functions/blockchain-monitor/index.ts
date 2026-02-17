@@ -8,7 +8,8 @@ const corsHeaders = {
 // Configuration constants
 const MAX_BLOCKS_PER_RUN = 10;
 const MAX_RPC_RETRIES = 3;
-const RPC_RETRY_DELAY = 1000;
+const RPC_RETRY_DELAY = 500;
+const RPC_TIMEOUT = 10000;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -72,7 +73,8 @@ Deno.serve(async (req) => {
             'Content-Type': 'application/json',
             'Authorization': `Basic ${btoa(`${rpcUser}:${rpcPassword}`)}`
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(RPC_TIMEOUT)
         });
 
         if (!response.ok) {
