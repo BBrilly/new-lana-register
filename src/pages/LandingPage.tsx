@@ -1,4 +1,4 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import React, { useEffect, useState, useMemo } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
 import NostrStatusDialog from "@/components/NostrStatusDialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import BlockDetailDialog from "@/components/BlockDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -33,6 +35,8 @@ interface WalletWithBalance {
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [systemParams, setSystemParams] = useState<SystemParameters | null>(null);
   const [relayStatuses, setRelayStatuses] = useState<RelayStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -599,9 +603,12 @@ const LandingPage = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
                 <span className="text-lg font-bold text-primary-foreground">L</span>
               </div>
-              <span className="text-xl font-semibold text-foreground">Lana Register</span>
+              <span className="text-xl font-semibold text-foreground hidden sm:inline">Lana Register</span>
+              <span className="text-xl font-semibold text-foreground sm:hidden">LR</span>
             </div>
-            <div className="flex items-center gap-4">
+
+            {/* Desktop nav */}
+            <div className="hidden md:flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => navigate("/api-docs")}>
                 <Database className="mr-2 h-4 w-4" />
                 API Docs
@@ -625,31 +632,70 @@ const LandingPage = () => {
                 Login
               </Button>
             </div>
+
+            {/* Mobile hamburger */}
+            {isMobile && (
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-64">
+                  <SheetHeader>
+                    <SheetTitle>Menu</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6 flex flex-col gap-2">
+                    <Button variant="ghost" className="justify-start gap-2" onClick={() => { navigate("/api-docs"); setMobileMenuOpen(false); }}>
+                      <Database className="h-4 w-4" />
+                      API Docs
+                    </Button>
+                    <Button variant="ghost" className="justify-start gap-2" onClick={() => setMobileMenuOpen(false)}>
+                      <Activity className="h-4 w-4" />
+                      Nostr Standards
+                    </Button>
+                    {!isLoading && systemParams && (
+                      <Button
+                        variant="ghost"
+                        className="justify-start gap-2"
+                        onClick={() => { setShowStatusDialog(true); setMobileMenuOpen(false); }}
+                      >
+                        <Wifi className="h-4 w-4 text-success" />
+                        {connectedRelays}/{totalRelays} connected
+                      </Button>
+                    )}
+                    <Button className="justify-start gap-2" onClick={() => { navigate("/login"); setMobileMenuOpen(false); }}>
+                      Login
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="mb-8 text-center">
-          <h1 className="mb-4 text-6xl font-bold text-primary">Lana Register</h1>
-          <p className="text-xl text-muted-foreground">
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        <div className="mb-6 md:mb-8 text-center">
+          <h1 className="mb-3 md:mb-4 text-3xl sm:text-4xl md:text-6xl font-bold text-primary">Lana Register</h1>
+          <p className="text-base md:text-xl text-muted-foreground">
             Transparent blockchain monitoring and wallet registration system
           </p>
         </div>
 
         {/* Currently Auditing + Total Balance */}
-        <div className="mb-12 flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Shield className="h-6 w-6 text-success" />
-            <span className="text-lg text-foreground">
+        <div className="mb-8 md:mb-12 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2 text-center">
+            <Shield className="h-5 w-5 md:h-6 md:w-6 text-success shrink-0" />
+            <span className="text-sm md:text-lg text-foreground">
               Currently auditing <span className="font-bold text-primary">{stats.registeredWallets}</span> accounts
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Coins className="h-6 w-6 text-primary" />
-            <span className="text-lg text-foreground">
-              Total Amount of registered Lanas:{' '}
+          <div className="flex items-center gap-2 text-center">
+            <Coins className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
+            <span className="text-sm md:text-lg text-foreground">
+              Total registered Lanas:{' '}
               <span className="font-bold text-primary">
                 {walletsLoading ? 'Loading...' : `${totalRegisteredBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })} LANA`}
               </span>
@@ -658,7 +704,7 @@ const LandingPage = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="mb-12 grid gap-6 md:grid-cols-3">
+        <div className="mb-8 md:mb-12 grid gap-4 md:gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Card className="bg-success/10 p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/20">
@@ -699,7 +745,7 @@ const LandingPage = () => {
         </div>
 
         {/* Feature Cards */}
-        <div className="mb-12 grid gap-6 md:grid-cols-3">
+        <div className="mb-8 md:mb-12 grid gap-4 md:gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Card className="p-6 transition-all hover:shadow-lg">
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -741,38 +787,40 @@ const LandingPage = () => {
         </div>
 
         {/* Tabs Section */}
-        <Card className="p-6 overflow-hidden">
+        <Card className="p-3 sm:p-6 overflow-hidden">
           <Tabs defaultValue="blocks" className="w-full">
-            <TabsList className="mb-6 flex-wrap h-auto gap-1">
-              <TabsTrigger value="blocks" className="gap-2">
-                <Database className="h-4 w-4" />
-                Audited Blocks
-              </TabsTrigger>
-              <TabsTrigger value="unregistered" className="gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Unregistered Lanas ({totalUnregistered})
-              </TabsTrigger>
-              <TabsTrigger value="knights" className="gap-2">
-                <Shield className="h-4 w-4" />
-                Knights Wallets ({knightsWallets.length})
-              </TabsTrigger>
-              <TabsTrigger value="allwallets" className="gap-2">
-                <Wallet className="h-4 w-4" />
-                All Wallets ({allWallets.length})
-              </TabsTrigger>
-              <TabsTrigger value="lanapaysus" className="gap-2">
-                <Wallet className="h-4 w-4" />
-                LanaPays.Us ({lanaPayUsWallets.length})
-              </TabsTrigger>
-              <TabsTrigger value="lana8wonder" className="gap-2">
-                <Coins className="h-4 w-4" />
-                Lana8Wonder ({lana8WonderWallets.length})
-              </TabsTrigger>
-              <TabsTrigger value="registered" className="gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Knights TX ({registeredEvents.length})
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto -mx-3 sm:-mx-0 px-3 sm:px-0">
+              <TabsList className="mb-4 sm:mb-6 flex-wrap h-auto gap-1 w-max sm:w-auto">
+                <TabsTrigger value="blocks" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Database className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Audited </span>Blocks
+                </TabsTrigger>
+                <TabsTrigger value="unregistered" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Unregistered </span>({totalUnregistered})
+                </TabsTrigger>
+                <TabsTrigger value="knights" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Knights ({knightsWallets.length})
+                </TabsTrigger>
+                <TabsTrigger value="allwallets" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">All </span>Wallets ({allWallets.length})
+                </TabsTrigger>
+                <TabsTrigger value="lanapaysus" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
+                  LanaPays ({lanaPayUsWallets.length})
+                </TabsTrigger>
+                <TabsTrigger value="lana8wonder" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Coins className="h-3 w-3 sm:h-4 sm:w-4" />
+                  L8W ({lana8WonderWallets.length})
+                </TabsTrigger>
+                <TabsTrigger value="registered" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Knights </span>TX ({registeredEvents.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             {/* Audited Blocks Tab */}
             <TabsContent value="blocks">
@@ -832,9 +880,9 @@ const LandingPage = () => {
               
               {/* Blocks Pagination */}
               {totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {((currentPage - 1) * BLOCKS_PER_PAGE) + 1} to {Math.min(currentPage * BLOCKS_PER_PAGE, totalBlocks)} of {totalBlocks} blocks
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-xs sm:text-sm text-muted-foreground">
+                    {((currentPage - 1) * BLOCKS_PER_PAGE) + 1}-{Math.min(currentPage * BLOCKS_PER_PAGE, totalBlocks)} of {totalBlocks}
                   </div>
                   <Pagination>
                     <PaginationContent>
