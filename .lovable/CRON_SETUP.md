@@ -158,26 +158,6 @@ SELECT cron.schedule(
 
 ---
 
-### 8. Monthly Subscription Proposals
-**Interval:** 4x daily on the 20th of each month (`0 0,6,12,18 20 * *`)
-**Purpose:** Generates and publishes monthly subscription proposals (KIND 90900) for Lana8Wonder wallet holders. Runs multiple times for reliability; the function is idempotent.
-
-```sql
-SELECT cron.schedule(
-  'monthly-subscription-proposals',
-  '0 0,6,12,18 20 * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/monthly-subscription-proposals',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
-    body := '{}'::jsonb
-  ) AS request_id;
-  $$
-);
-```
-
----
-
 ## Summary Table
 
 | # | Cron Job | Schedule | Frequency |
@@ -189,4 +169,3 @@ SELECT cron.schedule(
 | 5 | `sync-profile-data` | `*/10 * * * *` | Every 10 minutes |
 | 6 | `kind-cron-37772-lanaknight-registry` | `*/10 * * * *` | Every 10 minutes |
 | 7 | `sync-system-parameters` | `0 * * * *` | Hourly |
-| 8 | `monthly-subscription-proposals` | `0 0,6,12,18 20 * *` | 20th of month, 4x |
