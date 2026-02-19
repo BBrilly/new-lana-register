@@ -18,8 +18,8 @@ const StatCard = ({ title, value, subtitle, icon, trend }: StatCardProps) => {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <h3 className="mt-2 text-3xl font-bold text-foreground">{value}</h3>
-          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+          <h3 className="mt-2 text-xl sm:text-3xl font-bold text-foreground break-all">{value}</h3>
+          {subtitle && <p className="mt-1 text-xs sm:text-sm text-muted-foreground break-words">{subtitle}</p>}
           {trend && (
             <div className="mt-2 flex items-center gap-1">
               <span
