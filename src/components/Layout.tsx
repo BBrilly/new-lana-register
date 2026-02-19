@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 import { logout, isAuthenticated, getAuthSession } from "@/utils/wifAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sheet,
   SheetContent,
@@ -25,7 +24,6 @@ const Layout = ({ children }: LayoutProps) => {
   const authenticated = isAuthenticated();
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -130,7 +128,7 @@ const Layout = ({ children }: LayoutProps) => {
             </div>
 
             {/* Mobile hamburger */}
-            {isMobile && (
+            <div className="md:hidden">
               <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -146,7 +144,7 @@ const Layout = ({ children }: LayoutProps) => {
                   </div>
                 </SheetContent>
               </Sheet>
-            )}
+            </div>
           </div>
         </div>
       </nav>
