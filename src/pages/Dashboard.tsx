@@ -95,7 +95,7 @@ const Dashboard = () => {
           <AddWalletDialog onAdd={handleAddWallet} />
         </div>
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total LAN"
             value={totalLan.toLocaleString("en-US", {
@@ -103,28 +103,28 @@ const Dashboard = () => {
               maximumFractionDigits: 2,
             })}
             subtitle="All wallets"
-            icon={<WalletIcon className="h-6 w-6" />}
+            icon={<WalletIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
           />
           <StatCard
             title={`Total ${userCurrency}`}
-            value={`${currencySymbol} ${totalFiat.toLocaleString("en-US", {
+            value={`${currencySymbol}${totalFiat.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}`}
-            subtitle={`Exchange rate: 1 LAN = ${exchangeRate.toFixed(6)} ${userCurrency}`}
-            icon={<DollarSign className="h-6 w-6" />}
+            subtitle={`1 LAN = ${exchangeRate.toFixed(4)} ${userCurrency}`}
+            icon={<DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />}
           />
           <StatCard
-            title="Active Wallets"
+            title="Wallets"
             value={totalWallets.toString()}
-            subtitle="Registered wallets"
-            icon={<TrendingUp className="h-6 w-6" />}
+            subtitle="Registered"
+            icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />}
           />
           <StatCard
-            title="Unreviewed Events"
+            title="Events"
             value={unreadEvents.toString()}
-            subtitle="Require your attention"
-            icon={<Activity className="h-6 w-6" />}
+            subtitle="Unreviewed"
+            icon={<Activity className="h-5 w-5 sm:h-6 sm:w-6" />}
           />
         </div>
 
@@ -153,7 +153,7 @@ const Dashboard = () => {
                 return (
                   <div
                     key={wallet.id}
-                    className={`flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50 ${
+                    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 gap-2 transition-colors hover:bg-muted/50 ${
                       isMainWallet 
                         ? "border-success/50 bg-success/5" 
                         : isLana8Wonder 
@@ -161,29 +161,28 @@ const Dashboard = () => {
                         : "border-border bg-background"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                    <div className="flex items-center gap-3">
+                      <div className={`flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-lg ${
                         isMainWallet ? "bg-success/10" : isLana8Wonder ? "bg-orange-500/10" : "bg-primary/10"
                       }`}>
-                        <WalletIcon className={`h-5 w-5 ${
+                        <WalletIcon className={`h-4 w-4 ${
                           isMainWallet ? "text-success" : isLana8Wonder ? "text-orange-500" : "text-primary"
                         }`} />
                       </div>
-                      <div>
-                        <p className="font-medium text-foreground">{wallet.type}</p>
-                        <p className="text-sm text-muted-foreground">{wallet.description}</p>
-                        <p className="font-mono text-xs text-muted-foreground">ID: {wallet.walletNumber}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">{wallet.type}</p>
+                        <p className="text-xs text-muted-foreground truncate">{wallet.description}</p>
+                        <p className="font-mono text-xs text-muted-foreground truncate">ID: {wallet.walletNumber}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-foreground">
+                    <div className="text-left sm:text-right pl-12 sm:pl-0">
+                      <p className="text-sm font-semibold text-foreground">
                         {wallet.lanAmount.toLocaleString("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
-                        })}{" "}
-                        LAN
+                        })} LAN
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {currencySymbol}{" "}
                         {wallet.eurAmount.toLocaleString("en-US", {
                           minimumFractionDigits: 2,
