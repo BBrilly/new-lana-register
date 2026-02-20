@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 
 interface WalletDeleteDialogProps {
   walletType: string;
@@ -61,8 +61,18 @@ const WalletDeleteDialog = ({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete wallet <strong>{walletType}</strong> ({walletNumber})?
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure you want to delete wallet <strong>{walletType}</strong> ({walletNumber})?
+                </p>
+                <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-warning mt-0.5" />
+                  <p className="text-foreground">
+                    <strong>Important:</strong> If you have recently sent LAN coins <em>from</em> this wallet, please wait at least <strong>24 hours</strong> before deleting it. Deleting too soon may cause those coins to be flagged as unregistered.
+                  </p>
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
