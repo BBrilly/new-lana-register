@@ -42,6 +42,34 @@ const Wallets = () => {
     }
   };
 
+  const handleUpdateNotes = async (id: string, notes: string) => {
+    const session = getAuthSession();
+    if (!session) {
+      toast.error("You must be logged in to update notes");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke("update-wallet-notes", {
+        body: {
+          api_key: "lk_w1fHNwvEKpCtgGjXqIEFz1yKEynnwuoe",
+          wallet_uuid: id,
+          nostr_id_hex: session.nostrHexId,
+          notes,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Update failed");
+
+      toast.success("Notes updated and synced to Nostr");
+      refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update notes");
+      throw err;
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -89,6 +117,7 @@ const Wallets = () => {
                 key={wallet.id} 
                 wallet={wallet} 
                 onDelete={handleDeleteWallet}
+                onUpdateNotes={handleUpdateNotes}
                 userCurrency={userCurrency}
                 fxRates={fxRates}
               />
