@@ -2,8 +2,9 @@ import { Wallet } from "@/types/wallet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink, Package } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink, Package, Pencil, X, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,14 +14,36 @@ import WalletDeleteDialog from "./WalletDeleteDialog";
 interface WalletCardProps {
   wallet: Wallet;
   onDelete: (id: string) => Promise<void>;
+  onUpdateNotes?: (id: string, notes: string) => Promise<void>;
   userCurrency: string;
   fxRates: { EUR: number; GBP: number; USD: number } | null;
 }
 
-const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps) => {
+const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: WalletCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editedNotes, setEditedNotes] = useState(wallet.description);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
   const navigate = useNavigate();
+
+  const handleSaveNotes = async () => {
+    if (!onUpdateNotes) return;
+    setIsSavingNotes(true);
+    try {
+      await onUpdateNotes(wallet.id, editedNotes);
+      setIsEditingNotes(false);
+    } catch {
+      // toast handled in parent
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedNotes(wallet.description);
+    setIsEditingNotes(false);
+  };
 
   const canDelete = !["main", "lana8wonder", "knights", "lanaknights"].some(
     t => wallet.type.toLowerCase().includes(t)
@@ -110,7 +133,41 @@ const WalletCard = ({ wallet, onDelete, userCurrency, fxRates }: WalletCardProps
                 {isMainWallet && <Badge className="bg-success/10 text-success">Main</Badge>}
                 {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{wallet.description}</p>
+              {isEditingNotes ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    value={editedNotes}
+                    onChange={(e) => setEditedNotes(e.target.value)}
+                    className="h-7 text-sm"
+                    autoFocus
+                    disabled={isSavingNotes}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveNotes();
+                      if (e.key === "Escape") handleCancelEdit();
+                    }}
+                  />
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleSaveNotes} disabled={isSavingNotes}>
+                    {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-success" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleCancelEdit} disabled={isSavingNotes}>
+                    <X className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-center gap-1 group">
+                  <p className="text-sm text-muted-foreground">{wallet.description || "No notes"}</p>
+                  {onUpdateNotes && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                      onClick={() => setIsEditingNotes(true)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
               <div className="mt-1 flex items-center gap-2">
                 <p className="font-mono text-xs text-muted-foreground truncate">ID: {wallet.walletNumber}</p>
                 <Button
