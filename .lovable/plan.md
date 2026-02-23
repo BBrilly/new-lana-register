@@ -1,91 +1,55 @@
 
 
-# NIP-04 Encrypted DM Notification for Unregistered LANA
+# Plan: Editable Wallet Notes with Nostr KIND 30889 Broadcast
 
 ## Overview
+Allow users to edit the "notes" (description) field on every wallet card, including the Main wallet. When saved, the change is persisted to the database and a fresh KIND 30889 event is broadcast to all Nostr relays with the updated wallet list.
 
-When the existing KIND 87003 cron function detects unregistered LANA coins on a user's wallet, it will also send a **NIP-04 encrypted direct message (Kind 4)** to the wallet owner's Nostr pubkey. This gives the user a personal, private notification in their Nostr chat client.
+## Frontend Changes
 
-## What changes
+### 1. WalletCard Component (`src/components/WalletCard.tsx`)
+- Add an "Edit" (pencil) icon button next to the wallet description text
+- When clicked, the description text becomes an inline editable input field
+- Show "Save" and "Cancel" buttons while editing
+- On save, call a new `onUpdateNotes` callback prop with the wallet ID and new note text
+- Show loading state during save, toast on success/failure
+- On cancel, revert to original text
 
-### 1. Database migration -- new tracking columns
+### 2. Wallets Page (`src/pages/Wallets.tsx`)
+- Add a `handleUpdateNotes` function that calls a new edge function `update-wallet-notes`
+- Pass `onUpdateNotes` prop to each `WalletCard`
+- Trigger `refetch()` after successful update
 
-Add two columns to `unregistered_lana_events` to track DM delivery separately from the KIND 87003 event:
+### 3. Wallet Type (`src/types/wallet.ts`)
+- No changes needed -- the existing `description` field maps to `notes` in the DB
 
-- `nostr_dm_sent` (boolean, default false) -- whether the NIP-04 DM was sent
-- `nostr_dm_event_id` (text, nullable) -- the Nostr event ID of the sent DM
+## Backend Changes
 
-### 2. Edge function changes (`kind-cron-87003-monitoring-unregistered-coins/index.ts`)
+### 4. New Edge Function: `update-wallet-notes` (`supabase/functions/update-wallet-notes/index.ts`)
+This function will:
+1. Validate the API key
+2. Verify the requesting user owns the wallet (via `nostr_hex_id` -> `main_wallets` -> `wallets`)
+3. Update the `notes` column in the `wallets` table
+4. Fetch all wallets for this user
+5. Read the registrar NSEC from `app_settings`
+6. Read relays from `system_parameters`
+7. Build and sign a KIND 30889 event with all wallet `w` tags (same format as `delete-wallet`)
+8. Broadcast to all relays
+9. Return success/failure
 
-**New import:** `nip04` from `nostr-tools` for NIP-04 encryption.
+The KIND 30889 event structure (matching existing pattern):
+- `d` tag: user's nostr hex ID
+- `status` tag: "active"
+- `w` tags: `[wallet_id, wallet_type, "LANA", note, amount_unregistered_lanoshi]` for each wallet
 
-**New function:** `sendEncryptedDM(privateKeyBytes, recipientPubkey, message, relays)` that:
-1. Encrypts the message using `nip04.encrypt(privateKeyHex, recipientPubkey, message)`
-2. Creates a Kind 4 event with tag `["p", recipientPubkey]`
-3. Signs and publishes it to the same relays
+### 5. Configuration (`supabase/config.toml`)
+- Add `[functions.update-wallet-notes]` with `verify_jwt = false`
 
-**Integration point:** After each successful KIND 87003 publish (line ~335), send the DM to the same `userPubkey`. Update the DB with `nostr_dm_sent = true` and `nostr_dm_event_id`.
+## Technical Details
 
-### 3. DM message content (English)
-
-```
-LANA Unregistered Coins Alert
-
-Your wallet [WALLET_ADDRESS] has received [AMOUNT] LANA from an unregistered source.
-
-These coins need to be regularized through the LANA Registrar. To resolve this:
-
-1. Open the LanaKnight app or visit the Registrar
-2. Send the unregistered amount ([AMOUNT] LANA) to the designated return address provided by the Registrar
-3. The Registrar will process your return and re-issue registered coins
-
-Video tutorial: https://youtu.be/NulmUXSZ4cE
-
-Please regularize these coins as soon as possible to maintain your wallet's compliance status.
-```
-
-## Technical details
-
-### NIP-04 encryption with nostr-tools
-
-```typescript
-import { nip04 } from 'https://esm.sh/nostr-tools@2.7.0';
-
-// Encrypt
-const ciphertext = await nip04.encrypt(privateKeyHex, recipientPubkeyHex, plaintext);
-
-// Create Kind 4 event
-const dmEvent = {
-  kind: 4,
-  created_at: Math.floor(Date.now() / 1000),
-  tags: [['p', recipientPubkeyHex]],
-  content: ciphertext,
-};
-
-const signedDm = finalizeEvent(dmEvent, privateKeyBytes);
-```
-
-### Processing flow
-
-```text
-For each unregistered event:
-  1. Publish KIND 87003 (existing logic)
-  2. If 87003 succeeded AND nostr_dm_sent = false:
-     a. Encrypt DM with NIP-04
-     b. Publish Kind 4 to relays
-     c. Update DB: nostr_dm_sent = true, nostr_dm_event_id = eventId
-  3. DM failure does NOT block 87003 success (independent tracking)
-```
-
-### Error handling
-
-- DM sending is wrapped in its own try/catch -- a failed DM will not affect the KIND 87003 flow
-- DM status is tracked independently, so on next cron run, events with `nostr_87003_published = true` but `nostr_dm_sent = false` can be retried (optional future enhancement)
-
-### Files modified
-
-| File | Change |
-|------|--------|
-| `supabase/functions/kind-cron-87003-monitoring-unregistered-coins/index.ts` | Add NIP-04 import, `sendEncryptedDM` function, call it after each KIND 87003 publish |
-| Database migration | Add `nostr_dm_sent` and `nostr_dm_event_id` columns to `unregistered_lana_events` |
+- The edge function reuses the same `createSignedEvent` and `broadcastToRelays` helper pattern from `delete-wallet`
+- The registrar NSEC is read from `app_settings` (key: `nostr_registrar_nsec`)
+- Relays are read from `system_parameters` table
+- API key validation uses the same `api_keys` table pattern
+- Ownership is verified by checking that the wallet's `main_wallet_id` belongs to a `main_wallets` record matching the provided `nostr_id_hex`
 
