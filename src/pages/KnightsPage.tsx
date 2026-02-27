@@ -7,7 +7,7 @@ import PublicWalletTable from "@/components/PublicWalletTable";
 
 const KnightsPage = () => {
   const navigate = useNavigate();
-  const { sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId } = usePublicWalletBalances(['Knights']);
+  const { sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId, fxRates, lanaLimits } = usePublicWalletBalances(['Knights']);
 
   return (
     <div className="min-h-screen bg-background">
@@ -22,6 +22,7 @@ const KnightsPage = () => {
             emptyMessage="No Knights wallets found"
             sortField={sortField} sortDirection={sortDirection} toggleSort={toggleSort}
             copiedId={copiedId} copyWalletId={copyWalletId}
+            fxRates={fxRates} lanaLimits={lanaLimits}
           />
         </Card>
       </div>

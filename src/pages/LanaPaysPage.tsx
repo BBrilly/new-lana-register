@@ -7,7 +7,7 @@ import PublicWalletTable from "@/components/PublicWalletTable";
 
 const LanaPaysPage = () => {
   const navigate = useNavigate();
-  const { sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId } = usePublicWalletBalances(['LanaPays.Us']);
+  const { sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId, fxRates, lanaLimits } = usePublicWalletBalances(['LanaPays.Us']);
 
   return (
     <div className="min-h-screen bg-background">
@@ -22,6 +22,7 @@ const LanaPaysPage = () => {
             emptyMessage="No LanaPays.Us wallets found"
             sortField={sortField} sortDirection={sortDirection} toggleSort={toggleSort}
             copiedId={copiedId} copyWalletId={copyWalletId}
+            fxRates={fxRates} lanaLimits={lanaLimits}
           />
         </Card>
       </div>

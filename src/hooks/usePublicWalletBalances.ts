@@ -11,12 +11,30 @@ export interface WalletWithBalance {
   balance: number;
 }
 
+export interface FxLimits {
+  EUR: number;
+  GBP: number;
+  USD: number;
+}
+
 export const usePublicWalletBalances = (walletTypes: string[]) => {
   const [walletBalances, setWalletBalances] = useState<WalletWithBalance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<'name' | 'balance' | 'wallet_type'>('balance');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [fxRates, setFxRates] = useState<FxLimits | null>(null);
+
+  // Calculate how much 50 EUR/GBP/USD is in LANA
+  // FX rate = how many EUR per 1 LANA, so 50 EUR / rate = LANA limit
+  const lanaLimits = useMemo(() => {
+    if (!fxRates) return null;
+    return {
+      EUR: fxRates.EUR > 0 ? 50 / fxRates.EUR : Infinity,
+      GBP: fxRates.GBP > 0 ? 50 / fxRates.GBP : Infinity,
+      USD: fxRates.USD > 0 ? 50 / fxRates.USD : Infinity,
+    };
+  }, [fxRates]);
 
   useEffect(() => {
     const load = async () => {
@@ -50,12 +68,20 @@ export const usePublicWalletBalances = (walletTypes: string[]) => {
 
         const { data: sysParams } = await supabase
           .from('system_parameters')
-          .select('electrum')
+          .select('electrum, fx')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (!sysParams?.electrum) { console.error('No Electrum servers'); return; }
+
+        // Parse FX rates
+        const fx = (sysParams as any).fx || {};
+        setFxRates({
+          EUR: fx.EUR || 0,
+          GBP: fx.GBP || 0,
+          USD: fx.USD || 0,
+        });
 
         const electrumServers = (sysParams.electrum as any[]).map(s => ({
           host: s.host, port: parseInt(s.port, 10)
@@ -121,5 +147,5 @@ export const usePublicWalletBalances = (walletTypes: string[]) => {
   const totalBalance = useMemo(() => walletBalances.reduce((s, w) => s + w.balance, 0), [walletBalances]);
   const sorted = useMemo(() => sortWallets(walletBalances), [walletBalances, sortField, sortDirection]);
 
-  return { walletBalances, sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId };
+  return { walletBalances, sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId, fxRates, lanaLimits };
 };
