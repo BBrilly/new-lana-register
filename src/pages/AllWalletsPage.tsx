@@ -9,7 +9,7 @@ const WALLET_TYPES = ['Wallet', 'Main Wallet', 'Knights', 'LanaPays.Us', 'Lana.D
 
 const AllWalletsPage = () => {
   const navigate = useNavigate();
-  const { sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId } = usePublicWalletBalances(WALLET_TYPES);
+  const { sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId, fxRates, lanaLimits } = usePublicWalletBalances(WALLET_TYPES);
 
   return (
     <div className="min-h-screen bg-background">
@@ -24,6 +24,7 @@ const AllWalletsPage = () => {
             emptyMessage="No wallets found" showWalletType
             sortField={sortField} sortDirection={sortDirection} toggleSort={toggleSort}
             copiedId={copiedId} copyWalletId={copyWalletId}
+            fxRates={fxRates} lanaLimits={lanaLimits}
           />
         </Card>
       </div>
