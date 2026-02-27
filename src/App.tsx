@@ -13,6 +13,10 @@ import Login from "./pages/Login";
 import AdminPanel from "./pages/AdminPanel";
 import ApiDocs from "./pages/ApiDocs";
 import NotFound from "./pages/NotFound";
+import AllWalletsPage from "./pages/AllWalletsPage";
+import KnightsPage from "./pages/KnightsPage";
+import LanaPaysPage from "./pages/LanaPaysPage";
+import LanaDiscountPage from "./pages/LanaDiscountPage";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +36,10 @@ const App = () => (
           <Route path="/send-to-register" element={<SendToRegister />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/api-docs" element={<ApiDocs />} />
+          <Route path="/all-wallets" element={<AllWalletsPage />} />
+          <Route path="/knights" element={<KnightsPage />} />
+          <Route path="/lanapays" element={<LanaPaysPage />} />
+          <Route path="/lana-discount" element={<LanaDiscountPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
