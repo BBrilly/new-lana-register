@@ -1,0 +1,125 @@
+import { useState, useEffect, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export interface WalletWithBalance {
+  id: string;
+  wallet_id: string | null;
+  wallet_type: string;
+  name: string | null;
+  display_name: string | null;
+  balance: number;
+}
+
+export const usePublicWalletBalances = (walletTypes: string[]) => {
+  const [walletBalances, setWalletBalances] = useState<WalletWithBalance[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<'name' | 'balance' | 'wallet_type'>('balance');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const allWallets: any[] = [];
+        const PAGE_SIZE = 1000;
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('wallets')
+            .select(`id, wallet_id, wallet_type, main_wallet:main_wallets(name, display_name)`)
+            .in('wallet_type', walletTypes)
+            .range(offset, offset + PAGE_SIZE - 1);
+
+          if (error) throw error;
+          if (!data || data.length === 0) { hasMore = false; }
+          else {
+            allWallets.push(...data);
+            hasMore = data.length === PAGE_SIZE;
+            offset += PAGE_SIZE;
+          }
+        }
+
+        if (allWallets.length === 0) { setWalletBalances([]); return; }
+
+        const walletAddresses = allWallets.filter(w => w.wallet_id).map(w => w.wallet_id as string);
+        if (walletAddresses.length === 0) { setWalletBalances([]); return; }
+
+        const { data: sysParams } = await supabase
+          .from('system_parameters')
+          .select('electrum')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!sysParams?.electrum) { console.error('No Electrum servers'); return; }
+
+        const electrumServers = (sysParams.electrum as any[]).map(s => ({
+          host: s.host, port: parseInt(s.port, 10)
+        }));
+
+        const { data: balanceData, error: balanceError } = await supabase.functions.invoke(
+          'fetch-wallet-balance',
+          { body: { wallet_addresses: walletAddresses, electrum_servers: electrumServers } }
+        );
+
+        if (balanceError) console.error('Balance error:', balanceError);
+
+        const balanceMap = new Map<string, number>();
+        if (balanceData?.wallets) {
+          balanceData.wallets.forEach((w: any) => balanceMap.set(w.wallet_id, w.balance || 0));
+        }
+
+        setWalletBalances(allWallets.map(wallet => ({
+          id: wallet.id,
+          wallet_id: wallet.wallet_id,
+          wallet_type: wallet.wallet_type,
+          name: (wallet.main_wallet as any)?.name || null,
+          display_name: (wallet.main_wallet as any)?.display_name || null,
+          balance: balanceMap.get(wallet.wallet_id || '') || 0,
+        })));
+      } catch (err) {
+        console.error('Error loading wallets:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [walletTypes.join(',')]);
+
+  const sortWallets = (wallets: WalletWithBalance[]) => {
+    return [...wallets].sort((a, b) => {
+      if (sortField === 'balance') {
+        return sortDirection === 'desc' ? b.balance - a.balance : a.balance - b.balance;
+      } else if (sortField === 'wallet_type') {
+        return sortDirection === 'desc'
+          ? b.wallet_type.toLowerCase().localeCompare(a.wallet_type.toLowerCase())
+          : a.wallet_type.toLowerCase().localeCompare(b.wallet_type.toLowerCase());
+      } else {
+        const nameA = (a.display_name || a.name || '').toLowerCase();
+        const nameB = (b.display_name || b.name || '').toLowerCase();
+        return sortDirection === 'desc' ? nameB.localeCompare(nameA) : nameA.localeCompare(nameB);
+      }
+    });
+  };
+
+  const toggleSort = (field: 'name' | 'balance' | 'wallet_type') => {
+    if (sortField === field) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDirection('desc'); }
+  };
+
+  const copyWalletId = (walletId: string) => {
+    navigator.clipboard.writeText(walletId);
+    setCopiedId(walletId);
+    toast.success('Wallet ID copied to clipboard');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const totalBalance = useMemo(() => walletBalances.reduce((s, w) => s + w.balance, 0), [walletBalances]);
+  const sorted = useMemo(() => sortWallets(walletBalances), [walletBalances, sortField, sortDirection]);
+
+  return { walletBalances, sorted, totalBalance, isLoading, copiedId, sortField, sortDirection, toggleSort, copyWalletId };
+};
