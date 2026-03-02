@@ -150,6 +150,45 @@ const ApiDocs = () => {
     }
   }'`;
 
+  // ====== simple_check_wallet_registration examples ======
+  const simpleCheckRequest = `{
+  "method": "simple_check_wallet_registration",
+  "api_key": "YOUR_API_KEY",
+  "data": {
+    "wallet_id": "LWalletAddress123456789012345678"
+  }
+}`;
+
+  const simpleCheckFound = `{
+  "success": true,
+  "registered": true,
+  "wallet": {
+    "wallet_id": "LWalletAddress123456789012345678",
+    "wallet_type": "Main Wallet",
+    "main_wallet_id": "550e8400-e29b-41d4-a716-446655440000",
+    "created_at": "2025-06-15T10:30:00.000Z"
+  },
+  "correlation_id": "uuid-string"
+}`;
+
+  const simpleCheckNotFound = `{
+  "success": true,
+  "registered": false,
+  "wallet_id": "LWalletAddress123456789012345678",
+  "correlation_id": "uuid-string"
+}`;
+
+  const simpleCheckCurl = `curl -X POST \\
+  'https://laluxmwarlejdwyboudz.supabase.co/functions/v1/check' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "method": "simple_check_wallet_registration",
+    "api_key": "YOUR_API_KEY",
+    "data": {
+      "wallet_id": "LWalletAddress123456789012345678"
+    }
+  }'`;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -537,6 +576,119 @@ const ApiDocs = () => {
           </TabsContent>
         </Tabs>
 
+        {/* ========== ENDPOINT 2: CHECK ========== */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <FileCode className="h-6 w-6 text-primary" />
+            Endpoint 2: Check
+          </h2>
+
+          {/* Endpoint Overview */}
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-foreground mb-2">Read-Only Endpoint</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    This endpoint only <strong>reads</strong> from the database — no writes, no Nostr broadcasts, no registrations.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className="bg-success text-success-foreground">POST</Badge>
+                    <code className="px-3 py-1.5 rounded bg-muted text-foreground text-sm font-mono break-all">
+                      /functions/v1/check
+                    </code>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Method: simple_check_wallet_registration */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCode className="h-5 w-5 text-primary" />
+                Method: simple_check_wallet_registration
+              </CardTitle>
+              <CardDescription>
+                Check if a wallet address is currently registered in the wallets table. Returns registration status and basic metadata if found.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Description */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                <p className="text-foreground">
+                  A lightweight, read-only check that queries the <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">wallets</code> table
+                  for a matching <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">wallet_id</code>. No side effects — purely informational.
+                </p>
+                <ul className="mt-3 space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    Returns wallet metadata (type, main_wallet_id, created_at) if registered
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    Returns <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">registered: false</code> if not found
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    No writes, no Nostr broadcasts, no balance checks
+                  </li>
+                </ul>
+              </div>
+
+              {/* Request Body */}
+              <CodeBlock code={simpleCheckRequest} sectionId="sc-request" label="Request Body" />
+
+              {/* Parameters */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Parameters</h4>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Field</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Required</TableHead>
+                        <TableHead>Description</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-mono text-sm">method</TableCell>
+                        <TableCell><Badge variant="outline">string</Badge></TableCell>
+                        <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                        <TableCell className="text-muted-foreground">Must be "simple_check_wallet_registration"</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-sm">api_key</TableCell>
+                        <TableCell><Badge variant="outline">string</Badge></TableCell>
+                        <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                        <TableCell className="text-muted-foreground">Your API authentication key</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-sm">data.wallet_id</TableCell>
+                        <TableCell><Badge variant="outline">string</Badge></TableCell>
+                        <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                        <TableCell className="text-muted-foreground">LANA wallet address (starts with 'L', 26-35 chars)</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Responses */}
+              <CodeBlock code={simpleCheckFound} sectionId="sc-found" label="Response — Wallet Found (200)" />
+              <CodeBlock code={simpleCheckNotFound} sectionId="sc-notfound" label="Response — Wallet Not Found (200)" />
+
+              {/* cURL */}
+              <CodeBlock code={simpleCheckCurl} sectionId="sc-curl" label="cURL Example" />
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Error Codes */}
         <Card className="mb-8">
           <CardHeader>
@@ -638,6 +790,7 @@ const ApiDocs = () => {
               <div>
                 <h4 className="font-medium text-foreground mb-2">API Response Times</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• simple_check_wallet_registration: ~200-500ms</li>
                   <li>• check_wallet (existing): ~500ms-1s</li>
                   <li>• check_wallet (new registration): ~2-3s</li>
                   <li>• register_virgin_wallets: ~3-5s</li>
