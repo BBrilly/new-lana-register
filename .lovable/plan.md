@@ -1,22 +1,24 @@
 
 
-# Plan: Add "Lana.Discount" Tab to Landing Page
+# Plan: Clarify API Docs -- One Endpoint, Two Methods
 
-Add a new tab following the exact same pattern as the LanaPays.Us tab.
+## Problem
+Both tabs show `POST /functions/v1/register-virgin-wallets` independently, making it look like a copy-paste error. There is no explanation that both methods share a single endpoint and are distinguished by the `method` field in the request body.
 
-## Changes in `src/pages/LandingPage.tsx`
+## Changes in `src/pages/ApiDocs.tsx`
 
-### 1. Include "Lana.Discount" in wallet type filter (line 279)
-Add `'Lana.Discount'` to the `.in('wallet_type', [...])` array so these wallets are fetched from the database.
+### 1. Add an "Endpoint Overview" info box before the tabs (after the Authentication card, before line 246)
+Add a card or info box explaining:
+- This is a **single endpoint**: `POST /functions/v1/register-virgin-wallets`
+- The `method` field in the request body determines which operation runs
+- Two available methods: `check_wallet` and `register_virgin_wallets_for_existing_user`
 
-### 2. Add filtered/sorted wallet lists (around lines 475-509)
-- Add `lanaDiscountWallets` memo filtering by `wallet_type === 'Lana.Discount'`
-- Add `lanaDiscountTotalBalance` memo
-- Add `sortedLanaDiscountWallets` memo using the existing `sortWallets` function
+### 2. Remove duplicate endpoint sections from each tab
+Remove the "Endpoint" sub-section (lines 266-274 and 428-436) from both tab contents, since the endpoint is now shown once above the tabs.
 
-### 3. Add TabsTrigger (after LanaPays trigger, line ~813)
-New tab trigger: `Lana.Discount ({lanaDiscountWallets.length})`
+### 3. Update tab titles for clarity
+- "Check Wallet" -> "Method: check_wallet"
+- "Register Virgin Wallets" -> "Method: register_virgin_wallets_for_existing_user"
 
-### 4. Add TabsContent (after LanaPays content, after line ~1561)
-Copy the LanaPays.Us `TabsContent` block and adapt it for Lana.Discount wallets -- same table structure with #, Name, Wallet ID, Balance columns.
+This makes it immediately clear that these are two methods on one endpoint, not two separate endpoints.
 
