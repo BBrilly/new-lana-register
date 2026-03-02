@@ -242,11 +242,36 @@ const ApiDocs = () => {
           </CardContent>
         </Card>
 
+        {/* Endpoint Overview */}
+        <Card className="mb-8 border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <h3 className="font-semibold text-foreground mb-2">Single Endpoint — Two Methods</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Both operations below use the <strong>same endpoint</strong>. The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">method</code> field in the request body determines which operation is executed.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  <Badge className="bg-success text-success-foreground">POST</Badge>
+                  <code className="px-3 py-1.5 rounded bg-muted text-foreground text-sm font-mono break-all">
+                    /functions/v1/register-virgin-wallets
+                  </code>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "check_wallet"</code> — Check & auto-register a single wallet</p>
+                  <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "register_virgin_wallets_for_existing_user"</code> — Bulk register wallets for existing profile</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* API Methods Tabs */}
         <Tabs defaultValue="check_wallet" className="mb-8">
           <TabsList className="mb-4 w-full sm:w-auto flex">
-            <TabsTrigger value="check_wallet" className="flex-1 sm:flex-none">Check Wallet</TabsTrigger>
-            <TabsTrigger value="register_virgin" className="flex-1 sm:flex-none">Register Virgin Wallets</TabsTrigger>
+            <TabsTrigger value="check_wallet" className="flex-1 sm:flex-none text-xs sm:text-sm">Method: check_wallet</TabsTrigger>
+            <TabsTrigger value="register_virgin" className="flex-1 sm:flex-none text-xs sm:text-sm">Method: register_virgin_wallets</TabsTrigger>
           </TabsList>
 
           {/* ====== CHECK WALLET TAB ====== */}
@@ -262,16 +287,7 @@ const ApiDocs = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Endpoint */}
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Endpoint</h4>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-success text-success-foreground">POST</Badge>
-                    <code className="px-3 py-1.5 rounded bg-muted text-foreground text-sm font-mono break-all">
-                      /functions/v1/register-virgin-wallets
-                    </code>
-                  </div>
-                </div>
+                {/* Endpoint removed — shown in overview above */}
 
                 {/* Description */}
                 <div>
@@ -424,16 +440,7 @@ const ApiDocs = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Endpoint */}
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Endpoint</h4>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-success text-success-foreground">POST</Badge>
-                    <code className="px-3 py-1.5 rounded bg-muted text-foreground text-sm font-mono break-all">
-                      /functions/v1/register-virgin-wallets
-                    </code>
-                  </div>
-                </div>
+                {/* Endpoint removed — shown in overview above */}
 
                 {/* Description */}
                 <div>
