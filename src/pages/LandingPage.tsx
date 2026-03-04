@@ -66,6 +66,10 @@ const LandingPage = () => {
   const [registeredEventsLoading, setRegisteredEventsLoading] = useState(false);
   const [currentSplit, setCurrentSplit] = useState<number | null>(null);
 
+  // Outgoing TX state (registered -> unregistered)
+  const [outgoingTx, setOutgoingTx] = useState<any[]>([]);
+  const [outgoingTxLoading, setOutgoingTxLoading] = useState(false);
+
   // Wallet balances state
   const [walletBalances, setWalletBalances] = useState<WalletWithBalance[]>([]);
   const [walletsLoading, setWalletsLoading] = useState(false);
@@ -459,6 +463,68 @@ const LandingPage = () => {
     loadRegisteredEvents();
   }, []);
 
+  // Load outgoing transactions (registered -> unregistered)
+  useEffect(() => {
+    const loadOutgoingTx = async () => {
+      try {
+        setOutgoingTxLoading(true);
+
+        const { data: transactions, error } = await supabase
+          .from('transactions')
+          .select('id, amount, block_id, notes, created_at, from_wallet_id')
+          .not('from_wallet_id', 'is', null)
+          .is('to_wallet_id', null)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching outgoing tx:', error);
+          return;
+        }
+
+        if (!transactions || transactions.length === 0) {
+          setOutgoingTx([]);
+          return;
+        }
+
+        // Get sender wallet details
+        const walletIds = [...new Set(transactions.map(tx => tx.from_wallet_id).filter(Boolean))];
+        
+        const { data: wallets } = await supabase
+          .from('wallets')
+          .select(`
+            id,
+            wallet_id,
+            main_wallet:main_wallets(name, display_name)
+          `)
+          .in('id', walletIds);
+
+        const walletMap = new Map(wallets?.map(w => [w.id, w]) || []);
+
+        const formatted = transactions.map(tx => {
+          const wallet = walletMap.get(tx.from_wallet_id);
+          // Parse destination address from notes (pattern: "to ADDRESS")
+          const toMatch = tx.notes?.match(/to\s+(L[A-Za-z0-9]+)/i);
+          const toAddress = toMatch ? toMatch[1] : tx.notes || '-';
+
+          return {
+            ...tx,
+            from_name: (wallet?.main_wallet as any)?.display_name || (wallet?.main_wallet as any)?.name || null,
+            from_address: wallet?.wallet_id || null,
+            to_address: toAddress,
+          };
+        });
+
+        setOutgoingTx(formatted);
+      } catch (error) {
+        console.error('Error loading outgoing tx:', error);
+      } finally {
+        setOutgoingTxLoading(false);
+      }
+    };
+
+    loadOutgoingTx();
+  }, []);
+
   // Filter and sort wallets for different tabs
   const knightsWallets = useMemo(() => {
     return walletBalances.filter(w => w.wallet_type === 'Knights');
@@ -831,6 +897,10 @@ const LandingPage = () => {
                 <TabsTrigger value="registered" className="gap-1 sm:gap-2 text-xs sm:text-sm">
                   <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Knights </span>TX ({registeredEvents.length})
+                </TabsTrigger>
+                <TabsTrigger value="outgoing" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Outgoing </span>TX ({outgoingTx.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1879,6 +1949,81 @@ const LandingPage = () => {
                             </TableCell>
                             <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
                               {event.notes || '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Outgoing TX Tab */}
+            <TabsContent value="outgoing">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Transactions sent from registered wallets to unregistered addresses
+                </p>
+              </div>
+
+              {outgoingTxLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>From</TableHead>
+                        <TableHead>To</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Block</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {outgoingTx.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No outgoing transactions found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        outgoingTx.map((tx, index) => (
+                          <TableRow key={tx.id}>
+                            <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                {tx.from_name && (
+                                  <div className="font-medium text-sm">{tx.from_name}</div>
+                                )}
+                                {tx.from_address && (
+                                  <div className="font-mono text-xs text-muted-foreground">
+                                    {`${tx.from_address.substring(0, 8)}...${tx.from_address.slice(-6)}`}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-mono text-xs text-muted-foreground">
+                                {tx.to_address.length > 20
+                                  ? `${tx.to_address.substring(0, 8)}...${tx.to_address.slice(-6)}`
+                                  : tx.to_address}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-primary">
+                              {Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {tx.block_id ? `#${tx.block_id}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {tx.created_at
+                                ? formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })
+                                : '-'}
                             </TableCell>
                           </TableRow>
                         ))
