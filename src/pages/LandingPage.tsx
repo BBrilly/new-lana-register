@@ -500,6 +500,15 @@ const LandingPage = () => {
 
         const walletMap = new Map(wallets?.map(w => [w.id, w]) || []);
 
+        // Fetch deleted wallets to mark them
+        const { data: deletedWallets } = await supabase
+          .from('deleted_wallets')
+          .select('wallet_id');
+
+        const deletedAddressSet = new Set(
+          deletedWallets?.map(dw => dw.wallet_id).filter(Boolean) || []
+        );
+
         const formatted = transactions.map(tx => {
           const wallet = walletMap.get(tx.from_wallet_id);
           // Parse destination address from notes (pattern: "to ADDRESS")
@@ -511,6 +520,7 @@ const LandingPage = () => {
             from_name: (wallet?.main_wallet as any)?.display_name || (wallet?.main_wallet as any)?.name || null,
             from_address: wallet?.wallet_id || null,
             to_address: toAddress,
+            to_was_deleted: deletedAddressSet.has(toAddress),
           };
         });
 
@@ -2028,6 +2038,9 @@ const LandingPage = () => {
                                   ? `${tx.to_address.substring(0, 8)}...${tx.to_address.slice(-6)}`
                                   : tx.to_address}
                                 <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                {tx.to_was_deleted && (
+                                  <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">Deleted</Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-semibold text-primary">
