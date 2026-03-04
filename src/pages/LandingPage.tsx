@@ -2001,17 +2001,33 @@ const LandingPage = () => {
                                   <div className="font-medium text-sm">{tx.from_name}</div>
                                 )}
                                 {tx.from_address && (
-                                  <div className="font-mono text-xs text-muted-foreground">
+                                  <div
+                                    className="font-mono text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors inline-flex items-center gap-1 group"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(tx.from_address);
+                                      toast.success("From address copied!");
+                                    }}
+                                    title="Click to copy"
+                                  >
                                     {`${tx.from_address.substring(0, 8)}...${tx.from_address.slice(-6)}`}
+                                    <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 )}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="font-mono text-xs text-muted-foreground">
+                              <div
+                                className="font-mono text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors inline-flex items-center gap-1 group"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(tx.to_address);
+                                  toast.success("To address copied!");
+                                }}
+                                title="Click to copy"
+                              >
                                 {tx.to_address.length > 20
                                   ? `${tx.to_address.substring(0, 8)}...${tx.to_address.slice(-6)}`
                                   : tx.to_address}
+                                <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-semibold text-primary">
