@@ -60,6 +60,7 @@ const LandingPage = () => {
   const EVENTS_PER_PAGE = 50;
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [eventNotes, setEventNotes] = useState<Record<string, string | null>>({});
+  const [deletedWalletIds, setDeletedWalletIds] = useState<Set<string>>(new Set());
 
   // Registered Lana Events (Knights transactions) state
   const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
@@ -106,6 +107,15 @@ const LandingPage = () => {
     };
 
     loadSystemParameters();
+  }, []);
+
+  // Fetch deleted wallet IDs for cross-referencing
+  useEffect(() => {
+    const loadDeletedWallets = async () => {
+      const { data } = await supabase.from('deleted_wallets').select('wallet_id');
+      setDeletedWalletIds(new Set(data?.map(dw => dw.wallet_id).filter(Boolean) as string[] || []));
+    };
+    loadDeletedWallets();
   }, []);
 
   useEffect(() => {
@@ -1127,6 +1137,9 @@ const LandingPage = () => {
                                     >
                                       <Copy className="h-3 w-3" />
                                     </Button>
+                                  )}
+                                  {event.walletId && deletedWalletIds.has(event.walletId) && (
+                                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Deleted</Badge>
                                   )}
                                 </div>
                               </TableCell>
