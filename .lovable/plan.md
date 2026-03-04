@@ -1,35 +1,38 @@
 
 
-# Plan: New "Outgoing TX" Tab on Landing Page
+# Plan: Mark Deleted Wallets in Outgoing TX Tab
 
 ## What
-Add a new tab on the landing page showing transactions sent **from registered wallets to unregistered wallets** -- i.e., rows in the `transactions` table where `from_wallet_id IS NOT NULL` and `to_wallet_id IS NULL`.
+Cross-reference the "To" addresses in the Outgoing TX list with the `deleted_wallets` table. If a destination address was previously registered but has since been deleted, show a visual badge/indicator next to it.
 
-## Data Source
-Query `transactions` table filtered by:
-- `from_wallet_id` is not null (registered sender)
-- `to_wallet_id` is null (unregistered receiver)
+## Changes in `src/pages/LandingPage.tsx`
 
-Join with `wallets` and `main_wallets` to get the sender's name/display_name and wallet_id address. The destination address is extracted from the `notes` field (pattern: `"to ADDRESS"`).
+### 1. Fetch deleted wallets during outgoing TX loading
+After fetching transactions and sender wallets, also query `deleted_wallets` for all `wallet_id` values. Build a Set of deleted wallet addresses for fast lookup.
 
-## Changes
+```typescript
+const { data: deletedWallets } = await supabase
+  .from('deleted_wallets')
+  .select('wallet_id');
 
-### `src/pages/LandingPage.tsx`
+const deletedAddressSet = new Set(
+  deletedWallets?.map(dw => dw.wallet_id).filter(Boolean) || []
+);
+```
 
-1. **Add state** for outgoing transactions list + loading flag
-2. **Add data fetching** in existing `useEffect` block:
-   - Query `transactions` with `from_wallet_id.not.is.null` and `to_wallet_id.is.null`
-   - Select `id, amount, block_id, notes, created_at, from_wallet_id`
-   - Order by `created_at desc`
-   - Then fetch sender wallet details (wallet_id, main_wallet name/display_name) for the `from_wallet_id` values
-3. **Add new TabsTrigger**: "Outgoing TX ({count})" with `ArrowUp` icon
-4. **Add new TabsContent** with a table showing:
-   - `#` (index)
-   - **From** (owner name + truncated wallet address)
-   - **To** (unregistered address extracted from notes)
-   - **Amount** (formatted LANA)
-   - **Block** (block_id)
-   - **Date** (relative time using `formatDistanceToNow`)
+### 2. Add `is_deleted` flag to formatted data
+In the `formatted` mapping, check if `toAddress` exists in the `deletedAddressSet`:
 
-The destination address will be parsed from the `notes` field using a regex like `to (L[A-Za-z0-9]+)` or displayed as the full notes if parsing fails.
+```typescript
+return {
+  ...tx,
+  from_name: ...,
+  from_address: ...,
+  to_address: toAddress,
+  to_was_registered_then_deleted: deletedAddressSet.has(toAddress),
+};
+```
+
+### 3. Show badge in the "To" column
+When `tx.to_was_registered_then_deleted` is true, render a small destructive `Badge` (e.g., "Deleted") next to the address, making it visually distinct with a red/orange color.
 
