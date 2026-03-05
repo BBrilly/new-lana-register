@@ -519,18 +519,40 @@ const LandingPage = () => {
           deletedWallets?.map(dw => dw.wallet_id).filter(Boolean) || []
         );
 
-        const formatted = transactions.map(tx => {
-          const wallet = walletMap.get(tx.from_wallet_id);
-          // Parse destination address from notes (pattern: "to ADDRESS")
+        // Collect all parsed destination addresses
+        const parsedAddresses: string[] = [];
+        const txWithAddress = transactions.map(tx => {
           const toMatch = tx.notes?.match(/to\s+(L[A-Za-z0-9]+)/i);
           const toAddress = toMatch ? toMatch[1] : tx.notes || '-';
+          parsedAddresses.push(toAddress);
+          return { ...tx, toAddress };
+        });
+
+        // Check which destination addresses are actually registered
+        const uniqueAddresses = [...new Set(parsedAddresses.filter(a => a !== '-'))];
+        let registeredAddressSet = new Set<string>();
+        if (uniqueAddresses.length > 0) {
+          const { data: registeredWallets } = await supabase
+            .from('wallets')
+            .select('wallet_id')
+            .in('wallet_id', uniqueAddresses);
+          registeredAddressSet = new Set(
+            registeredWallets?.map(w => w.wallet_id).filter(Boolean) as string[] || []
+          );
+        }
+
+        // Filter out transactions where destination is actually registered
+        const filtered = txWithAddress.filter(tx => !registeredAddressSet.has(tx.toAddress));
+
+        const formatted = filtered.map(tx => {
+          const wallet = walletMap.get(tx.from_wallet_id);
 
           return {
             ...tx,
             from_name: (wallet?.main_wallet as any)?.display_name || (wallet?.main_wallet as any)?.name || null,
             from_address: wallet?.wallet_id || null,
-            to_address: toAddress,
-            to_was_deleted: deletedAddressSet.has(toAddress),
+            to_address: tx.toAddress,
+            to_was_deleted: deletedAddressSet.has(tx.toAddress),
           };
         });
 
