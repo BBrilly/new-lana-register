@@ -2006,10 +2006,18 @@ const LandingPage = () => {
 
             {/* Outgoing TX Tab */}
             <TabsContent value="outgoing">
-              <div className="mb-4">
+              <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
                   Transactions sent from registered wallets to unregistered addresses
                 </p>
+                {outgoingTx.length > 0 && (
+                  <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-1.5">
+                    <span className="text-xs text-muted-foreground">Total lost:</span>
+                    <span className="text-sm font-bold text-destructive">
+                      {outgoingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })} LANA
+                    </span>
+                  </div>
+                )}
               </div>
 
               {outgoingTxLoading ? (
