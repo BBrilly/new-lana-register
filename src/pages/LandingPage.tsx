@@ -32,6 +32,7 @@ interface WalletWithBalance {
   display_name: string | null;
   balance: number;
   freeze_reason?: string;
+  split_created?: number | null;
 }
 
 const FREEZE_LABELS: Record<string, string> = {
