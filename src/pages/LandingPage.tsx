@@ -31,7 +31,14 @@ interface WalletWithBalance {
   name: string | null;
   display_name: string | null;
   balance: number;
+  freeze_reason?: string;
 }
+
+const FREEZE_LABELS: Record<string, string> = {
+  frozen_l8w: "Late Registration",
+  frozen_max_cap: "Max Cap Exceeded",
+  frozen_too_wild: "Suspicious Activity",
+};
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -604,7 +611,7 @@ const LandingPage = () => {
         while (hasMore) {
           const { data, error } = await supabase
             .from('wallets')
-            .select(`id, wallet_id, wallet_type, main_wallet:main_wallets(name, display_name)`)
+            .select(`id, wallet_id, wallet_type, freeze_reason, main_wallet:main_wallets(name, display_name)`)
             .eq('frozen', true)
             .range(offset, offset + PAGE_SIZE - 1);
 
@@ -624,6 +631,7 @@ const LandingPage = () => {
           name: (w.main_wallet as any)?.name || null,
           display_name: (w.main_wallet as any)?.display_name || null,
           balance: 0,
+          freeze_reason: w.freeze_reason || "",
         })));
       } catch (err) {
         console.error('Error loading frozen wallets:', err);
@@ -2181,6 +2189,7 @@ const LandingPage = () => {
                         <TableHead>Owner</TableHead>
                         <TableHead>Wallet Type</TableHead>
                         <TableHead>Wallet Address</TableHead>
+                        <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2198,6 +2207,11 @@ const LandingPage = () => {
                             {wallet.wallet_id
                               ? `${wallet.wallet_id.slice(0, 8)}...${wallet.wallet_id.slice(-6)}`
                               : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              {FREEZE_LABELS[wallet.freeze_reason || ''] || wallet.freeze_reason || 'Unknown'}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant="destructive" className="gap-1">
