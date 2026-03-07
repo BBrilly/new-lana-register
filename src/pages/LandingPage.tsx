@@ -1,4 +1,4 @@
-import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Menu } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Coins, Database, Activity, Lock, Wifi, AlertTriangle, Wallet, Copy, ArrowUpDown, ArrowUp, ArrowDown, Check, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Menu, Snowflake } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -588,6 +588,54 @@ const LandingPage = () => {
     return walletBalances.filter(w => w.wallet_type === 'Lana.Discount');
   }, [walletBalances]);
 
+  // Frozen wallets state
+  const [frozenWallets, setFrozenWallets] = useState<WalletWithBalance[]>([]);
+  const [frozenLoading, setFrozenLoading] = useState(false);
+
+  useEffect(() => {
+    const loadFrozenWallets = async () => {
+      try {
+        setFrozenLoading(true);
+        const allFrozen: any[] = [];
+        const PAGE_SIZE = 1000;
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('wallets')
+            .select(`id, wallet_id, wallet_type, main_wallet:main_wallets(name, display_name)`)
+            .eq('frozen', true)
+            .range(offset, offset + PAGE_SIZE - 1);
+
+          if (error) throw error;
+          if (!data || data.length === 0) { hasMore = false; }
+          else {
+            allFrozen.push(...data);
+            hasMore = data.length === PAGE_SIZE;
+            offset += PAGE_SIZE;
+          }
+        }
+
+        setFrozenWallets(allFrozen.map(w => ({
+          id: w.id,
+          wallet_id: w.wallet_id,
+          wallet_type: w.wallet_type,
+          name: (w.main_wallet as any)?.name || null,
+          display_name: (w.main_wallet as any)?.display_name || null,
+          balance: 0,
+        })));
+      } catch (err) {
+        console.error('Error loading frozen wallets:', err);
+      } finally {
+        setFrozenLoading(false);
+      }
+    };
+    loadFrozenWallets();
+  }, []);
+
+  const frozenTotalBalance = 0;
+
   const lana8WonderTotalBalance = useMemo(() => {
     return lana8WonderWallets.reduce((sum, w) => sum + w.balance, 0);
   }, [lana8WonderWallets]);
@@ -943,6 +991,10 @@ const LandingPage = () => {
                 <TabsTrigger value="outgoing" className="gap-1 sm:gap-2 text-xs sm:text-sm">
                   <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Outgoing </span>TX ({outgoingTx.length})
+                </TabsTrigger>
+                <TabsTrigger value="frozen" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Snowflake className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Frozen </span>({frozenWallets.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -2100,6 +2152,61 @@ const LandingPage = () => {
                           </TableRow>
                         ))
                       )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Frozen Wallets Tab */}
+            <TabsContent value="frozen">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Wallets currently frozen by the registrar
+                </p>
+              </div>
+
+              {frozenLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : frozenWallets.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No frozen wallets found</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Wallet Type</TableHead>
+                        <TableHead>Wallet Address</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {frozenWallets.map((wallet, index) => (
+                        <TableRow key={wallet.id}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            {wallet.display_name || wallet.name || '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{wallet.wallet_type}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {wallet.wallet_id
+                              ? `${wallet.wallet_id.slice(0, 8)}...${wallet.wallet_id.slice(-6)}`
+                              : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="destructive" className="gap-1">
+                              <Snowflake className="h-3 w-3" />
+                              Frozen
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>

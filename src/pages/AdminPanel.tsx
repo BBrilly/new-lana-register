@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, RefreshCw, Wallet, TrendingUp, Key, Snowflake } from "lucide-react";
+import { Shield, RefreshCw, Wallet, TrendingUp, Key, Snowflake, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import StatCard from "@/components/StatCard";
 import ApiKeysManager from "@/components/ApiKeysManager";
 import FreezeManager from "@/components/FreezeManager";
+import FrozenAccountsTab from "@/components/FrozenAccountsTab";
 
 interface UnregisteredEvent {
   id: string;
@@ -214,6 +215,10 @@ const AdminPanel = () => {
               <Snowflake className="h-4 w-4" />
               Freeze
             </TabsTrigger>
+            <TabsTrigger value="frozen-accounts" className="flex items-center gap-1">
+              <Lock className="h-4 w-4" />
+              Frozen Accounts
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="events" className="space-y-4">
@@ -354,6 +359,10 @@ const AdminPanel = () => {
 
           <TabsContent value="freeze" className="space-y-4">
             <FreezeManager />
+          </TabsContent>
+
+          <TabsContent value="frozen-accounts" className="space-y-4">
+            <FrozenAccountsTab />
           </TabsContent>
         </Tabs>
       </div>

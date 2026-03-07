@@ -17,6 +17,7 @@ import AllWalletsPage from "./pages/AllWalletsPage";
 import KnightsPage from "./pages/KnightsPage";
 import LanaPaysPage from "./pages/LanaPaysPage";
 import LanaDiscountPage from "./pages/LanaDiscountPage";
+import FrozenWalletsPage from "./pages/FrozenWalletsPage";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/knights" element={<KnightsPage />} />
           <Route path="/lanapays" element={<LanaPaysPage />} />
           <Route path="/lana-discount" element={<LanaDiscountPage />} />
+          <Route path="/frozen-wallets" element={<FrozenWalletsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
