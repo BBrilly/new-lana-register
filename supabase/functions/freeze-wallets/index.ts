@@ -81,10 +81,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update frozen status in database
+    // Update frozen status and freeze_reason in database
     const { error: updateError } = await supabase
       .from("wallets")
-      .update({ frozen: freeze })
+      .update({ frozen: freeze, freeze_reason: freeze ? resolvedFreezeCode : "" })
       .in("id", wallet_ids);
 
     if (updateError) {
