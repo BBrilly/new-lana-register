@@ -55,7 +55,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { wallet_ids, freeze, nostr_hex_id } = body;
+    const { wallet_ids, freeze, freeze_reason, nostr_hex_id } = body;
+    const resolvedFreezeCode = freeze_reason || "frozen_l8w";
 
     console.log(`[${correlationId}] Freeze request: freeze=${freeze}, wallets=${wallet_ids?.length}, nostr_hex_id=${nostr_hex_id?.substring(0, 12)}`);
 
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
           const anyFrozen = (allWallets || []).some((w: any) => w.frozen);
 
           const walletTags = (allWallets || []).map((w: any) =>
-            ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? "frozen_l8w" : ""]
+            ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? resolvedFreezeCode : ""]
           );
 
           console.log(`[${correlationId}] Creating KIND 30889 with ${walletTags.length} wallet tags, status=${anyFrozen ? "frozen" : "active"}`);
