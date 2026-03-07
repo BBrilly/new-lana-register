@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Snowflake, Sun, Loader2, User, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,6 +37,14 @@ const FreezeManager = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [freezeDialogOpen, setFreezeDialogOpen] = useState(false);
+  const [freezeReason, setFreezeReason] = useState("frozen_l8w");
+
+  const FREEZE_CODES = [
+    { value: "frozen_l8w", label: "Late Wallet Registration", description: "Frozen due to late wallet registration" },
+    { value: "frozen_max_cap", label: "Maximum Cap Exceeded", description: "Frozen due to maximum balance cap exceeded" },
+    { value: "frozen_too_wild", label: "Suspicious Activity", description: "Frozen due to irregular or suspicious activity" },
+  ];
 
   const handleSearch = async () => {
     const hex = nostrHexInput.trim();
