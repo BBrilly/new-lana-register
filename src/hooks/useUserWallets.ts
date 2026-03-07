@@ -75,10 +75,11 @@ export const useUserWallets = () => {
           walletNumber: w.wallet_id || "N/A",
           type: w.wallet_type,
           description: w.notes || "No description",
-          lanAmount: 0, // Will be updated when balances are loaded
-          eurAmount: 0, // Will be updated when balances are loaded
-          events: [], // MOCK - will be implemented later
-          notification: undefined, // MOCK - will be implemented later
+          lanAmount: 0,
+          eurAmount: 0,
+          events: [],
+          notification: undefined,
+          splitCreated: w.split_created,
         }));
 
         // Sort wallets by type priority: Main → LanaPays.Us → Knights → others → Lana8Wonder

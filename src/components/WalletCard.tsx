@@ -132,6 +132,9 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
                 <h3 className="text-base sm:text-lg font-semibold text-foreground">{wallet.type}</h3>
                 {isMainWallet && <Badge className="bg-success/10 text-success">Main</Badge>}
                 {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
+                {wallet.splitCreated != null && (
+                  <Badge variant="outline" className="text-xs font-mono">Split #{wallet.splitCreated}</Badge>
+                )}
               </div>
               {isEditingNotes ? (
                 <div className="mt-1 flex items-center gap-2">
