@@ -1,16 +1,20 @@
 
 
-## Plan: Remove Dashboard, Make Wallets the Default
+# Fix: Filter out registered wallets from Outgoing TX tab
 
-The Dashboard page duplicates wallet information already shown on the Wallets page. We'll remove it and redirect all Dashboard references to Wallets.
+## Problem
+The Outgoing TX tab shows transactions where `to_wallet_id IS NULL`, assuming the recipient is unregistered. But some destinations ARE registered — the `to_wallet_id` just wasn't linked at transaction recording time. Example: `LZAHDoeKaJ1uTwXZ3bL8dfbJXT7Af9a8sW` is in `wallets` table but appears in Outgoing TX because its transaction record has `to_wallet_id = NULL`.
 
-### Changes
+## Fix in `src/pages/LandingPage.tsx`
 
-1. **`src/App.tsx`** -- Remove Dashboard import and route. Keep all other routes.
+After fetching transactions and parsing `toAddress` from notes, cross-reference all parsed destination addresses against the `wallets` table. Filter out any transaction where the destination address is actually registered.
 
-2. **`src/components/Layout.tsx`** -- Remove the Dashboard NavLink from navigation (both desktop and mobile). Remove `LayoutDashboard` icon import.
+### Steps:
+1. Collect all parsed `toAddress` values from the transactions
+2. Query `wallets` table to check which of these addresses are registered: `SELECT wallet_id FROM wallets WHERE wallet_id IN (...parsedAddresses)`
+3. Build a `registeredAddressSet` from the results
+4. Filter out transactions where `registeredAddressSet.has(toAddress)` before setting state
+5. Keep the existing `deletedAddressSet` logic — deleted wallets should still show (with badge) since they are no longer active
 
-3. **`src/pages/Login.tsx`** -- Change `navigate("/dashboard")` to `navigate("/wallets")` after successful login.
-
-4. **`src/pages/Dashboard.tsx`** -- Delete this file (no longer needed).
+This ensures only truly unregistered destinations appear in the Outgoing TX tab.
 

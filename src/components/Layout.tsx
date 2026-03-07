@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink } from "@/components/NavLink";
-import { Wallet, LayoutDashboard, LogOut, Shield, Menu } from "lucide-react";
+import { Wallet, LogOut, Shield, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { logout, isAuthenticated, getAuthSession } from "@/utils/wifAuth";
@@ -62,15 +62,6 @@ const Layout = ({ children }: LayoutProps) => {
 
   const navLinks = (
     <>
-      <NavLink
-        to="/dashboard"
-        className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        activeClassName="bg-secondary text-foreground"
-        onClick={() => setSheetOpen(false)}
-      >
-        <LayoutDashboard className="h-4 w-4" />
-        Dashboard
-      </NavLink>
       <NavLink
         to="/wallets"
         className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
