@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     // Find main_wallet for this nostr_hex_id
     const { data: mainWallet } = await supabase
       .from("main_wallets")
-      .select("id, nostr_hex_id")
+      .select("id, nostr_hex_id, status")
       .eq("nostr_hex_id", nostr_hex_id)
       .maybeSingle();
 
