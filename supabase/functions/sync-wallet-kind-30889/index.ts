@@ -276,6 +276,7 @@ async function syncWallets(supabase: any, parsed: ParsedEvent) {
         notes: wallet.note,
         amount_unregistered_lanoshi: wallet.amount_unregistered_lanoshi,
         frozen: isFrozen,
+        freeze_reason: wallet.freeze_status,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'wallet_id',
