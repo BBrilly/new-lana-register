@@ -1,20 +1,12 @@
 
+## Plan: Persist freeze_reason from Nostr relay sync
 
-# Fix: Filter out registered wallets from Outgoing TX tab
+### Problem
+The `sync-wallet-kind-30889` edge function parses `freeze_status` from KIND 30889 w-tag's 7th field but only writes `frozen: true/false` to the database. It does not write the `freeze_status` value into the `freeze_reason` column. This causes all frozen wallets to display "Unknown" as their reason.
 
-## Problem
-The Outgoing TX tab shows transactions where `to_wallet_id IS NULL`, assuming the recipient is unregistered. But some destinations ARE registered — the `to_wallet_id` just wasn't linked at transaction recording time. Example: `LZAHDoeKaJ1uTwXZ3bL8dfbJXT7Af9a8sW` is in `wallets` table but appears in Outgoing TX because its transaction record has `to_wallet_id = NULL`.
+### Fix
 
-## Fix in `src/pages/LandingPage.tsx`
+**1. `supabase/functions/sync-wallet-kind-30889/index.ts`** (line ~270-283)
+- Add `freeze_reason: wallet.freeze_status` to the upsert payload so the reason code from the relay is persisted.
 
-After fetching transactions and parsing `toAddress` from notes, cross-reference all parsed destination addresses against the `wallets` table. Filter out any transaction where the destination address is actually registered.
-
-### Steps:
-1. Collect all parsed `toAddress` values from the transactions
-2. Query `wallets` table to check which of these addresses are registered: `SELECT wallet_id FROM wallets WHERE wallet_id IN (...parsedAddresses)`
-3. Build a `registeredAddressSet` from the results
-4. Filter out transactions where `registeredAddressSet.has(toAddress)` before setting state
-5. Keep the existing `deletedAddressSet` logic — deleted wallets should still show (with badge) since they are no longer active
-
-This ensures only truly unregistered destinations appear in the Outgoing TX tab.
-
+That's the only change needed. The UI already reads `freeze_reason` from the database and maps it via `FREEZE_LABELS`. Once the sync function writes the value, both the admin Frozen Accounts tab and the public Landing Page frozen tab will display the correct reason.
