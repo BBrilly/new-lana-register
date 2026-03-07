@@ -2157,6 +2157,61 @@ const LandingPage = () => {
                 </div>
               )}
             </TabsContent>
+
+            {/* Frozen Wallets Tab */}
+            <TabsContent value="frozen">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Wallets currently frozen by the registrar
+                </p>
+              </div>
+
+              {frozenLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : frozenWallets.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No frozen wallets found</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Wallet Type</TableHead>
+                        <TableHead>Wallet Address</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {frozenWallets.map((wallet, index) => (
+                        <TableRow key={wallet.id}>
+                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            {wallet.display_name || wallet.name || '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{wallet.wallet_type}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {wallet.wallet_id
+                              ? `${wallet.wallet_id.slice(0, 8)}...${wallet.wallet_id.slice(-6)}`
+                              : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="destructive" className="gap-1">
+                              <Snowflake className="h-3 w-3" />
+                              Frozen
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </Card>
       </div>
