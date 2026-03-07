@@ -1,0 +1,1 @@
+ALTER TABLE public.wallets ADD COLUMN frozen boolean NOT NULL DEFAULT false;
