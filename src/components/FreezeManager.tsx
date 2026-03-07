@@ -308,7 +308,7 @@ const FreezeManager = () => {
                   size="sm"
                   className="gap-2"
                   disabled={selectedIds.size === 0 || isUpdating}
-                  onClick={() => handleFreeze(true)}
+                  onClick={handleFreezeClick}
                 >
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className="h-4 w-4" />}
                   Freeze ({selectedIds.size})
@@ -318,7 +318,7 @@ const FreezeManager = () => {
                   size="sm"
                   className="gap-2"
                   disabled={selectedIds.size === 0 || isUpdating}
-                  onClick={() => handleFreeze(false)}
+                  onClick={handleUnfreeze}
                 >
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sun className="h-4 w-4" />}
                   Unfreeze ({selectedIds.size})
