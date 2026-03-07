@@ -296,6 +296,7 @@ const LandingPage = () => {
                 id,
                 wallet_id,
                 wallet_type,
+                split_created,
                 main_wallet:main_wallets(name, display_name)
               `)
               .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder', 'LanaPays.Us', 'Lana.Discount'])
