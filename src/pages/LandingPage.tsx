@@ -1677,6 +1677,7 @@ const LandingPage = () => {
                           </Button>
                         </TableHead>
                         <TableHead>Wallet ID</TableHead>
+                        <TableHead className="text-center">Split</TableHead>
                         <TableHead className="text-right">
                           <Button 
                             variant="ghost" 
@@ -1702,7 +1703,7 @@ const LandingPage = () => {
                     <TableBody>
                       {sortedLanaPayUsWallets.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                             No LanaPays.Us wallets found
                           </TableCell>
                         </TableRow>
@@ -1732,6 +1733,13 @@ const LandingPage = () => {
                                     )}
                                   </Button>
                                 </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {wallet.split_created != null ? (
+                                <Badge variant="outline" className="text-xs font-mono">#{wallet.split_created}</Badge>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
                               )}
