@@ -1,0 +1,335 @@
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Search, Snowflake, Sun, Loader2, User, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface WalletRow {
+  id: string;
+  wallet_id: string | null;
+  wallet_type: string;
+  notes: string | null;
+  frozen: boolean;
+  balance?: number;
+}
+
+interface ProfileInfo {
+  id: string;
+  name: string;
+  display_name: string | null;
+  nostr_hex_id: string;
+  profile_pic_link: string | null;
+}
+
+const FreezeManager = () => {
+  const [nostrHexInput, setNostrHexInput] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [profile, setProfile] = useState<ProfileInfo | null>(null);
+  const [wallets, setWallets] = useState<WalletRow[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const handleSearch = async () => {
+    const hex = nostrHexInput.trim();
+    if (!hex || hex.length !== 64) {
+      toast.error("Nostr Hex ID mora biti 64 znakov");
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError(null);
+    setProfile(null);
+    setWallets([]);
+    setSelectedIds(new Set());
+
+    try {
+      // Find main_wallet by nostr_hex_id
+      const { data: mainWallet, error: mwError } = await supabase
+        .from("main_wallets")
+        .select("id, name, display_name, nostr_hex_id, profile_pic_link")
+        .eq("nostr_hex_id", hex)
+        .maybeSingle();
+
+      if (mwError) throw mwError;
+      if (!mainWallet) {
+        setSearchError("Profil s tem Nostr Hex ID ni bil najden");
+        return;
+      }
+
+      setProfile(mainWallet);
+
+      // Fetch wallets
+      const { data: walletsData, error: wError } = await supabase
+        .from("wallets")
+        .select("id, wallet_id, wallet_type, notes, frozen")
+        .eq("main_wallet_id", mainWallet.id);
+
+      if (wError) throw wError;
+
+      const walletRows: WalletRow[] = (walletsData || []).map((w: any) => ({
+        id: w.id,
+        wallet_id: w.wallet_id,
+        wallet_type: w.wallet_type,
+        notes: w.notes,
+        frozen: w.frozen ?? false,
+      }));
+
+      // Fetch balances
+      const addresses = walletRows.filter(w => w.wallet_id).map(w => w.wallet_id as string);
+      if (addresses.length > 0) {
+        const { data: sysParams } = await supabase
+          .from("system_parameters")
+          .select("electrum")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sysParams) {
+          const { data: balancesData } = await supabase.functions.invoke("fetch-wallet-balance", {
+            body: { wallet_addresses: addresses, electrum_servers: sysParams.electrum },
+          });
+
+          if (balancesData?.wallets) {
+            const balanceMap = new Map<string, number>();
+            balancesData.wallets.forEach((wb: any) => balanceMap.set(wb.wallet_id, wb.balance || 0));
+            walletRows.forEach(w => {
+              if (w.wallet_id) w.balance = balanceMap.get(w.wallet_id) ?? 0;
+            });
+          }
+        }
+      }
+
+      setWallets(walletRows);
+    } catch (err: any) {
+      console.error("Search error:", err);
+      setSearchError(err.message || "Napaka pri iskanju");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === wallets.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(wallets.map(w => w.id)));
+    }
+  };
+
+  const handleFreeze = async (freeze: boolean) => {
+    if (selectedIds.size === 0) {
+      toast.error("Izberite vsaj eno denarnico");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from("wallets")
+        .update({ frozen: freeze })
+        .in("id", ids);
+
+      if (error) throw error;
+
+      // Update local state
+      setWallets(prev =>
+        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: freeze } : w)
+      );
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} denarnic${ids.length === 1 ? "a" : ""} ${freeze ? "zamrznjenih" : "odmrznjenih"}`);
+    } catch (err: any) {
+      toast.error(err.message || "Napaka pri posodabljanju");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const totalBalance = wallets.reduce((sum, w) => sum + (w.balance ?? 0), 0);
+  const frozenCount = wallets.filter(w => w.frozen).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Search */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Snowflake className="h-5 w-5 text-primary" />
+            Freeze / Unfreeze Wallets
+          </CardTitle>
+          <CardDescription>
+            Vnesite Nostr Hex ID za prikaz profila in denarnic. Nato izberite denarnice za zamrznitev ali odmrznitev.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nostr Hex ID (64 znakov)"
+              value={nostrHexInput}
+              onChange={(e) => setNostrHexInput(e.target.value)}
+              className="font-mono text-sm"
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            />
+            <Button onClick={handleSearch} disabled={isSearching} className="gap-2 shrink-0">
+              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Išči
+            </Button>
+          </div>
+
+          {searchError && (
+            <div className="mt-4 flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <p className="text-sm">{searchError}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Profile Info */}
+      {profile && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              {profile.profile_pic_link ? (
+                <img src={profile.profile_pic_link} alt="" className="h-12 w-12 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <User className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-foreground">
+                  {profile.display_name || profile.name}
+                </h3>
+                <p className="font-mono text-xs text-muted-foreground truncate">{profile.nostr_hex_id}</p>
+              </div>
+              <div className="ml-auto flex gap-3 text-sm text-muted-foreground">
+                <span>{wallets.length} denarnic</span>
+                <span>•</span>
+                <span>{totalBalance.toFixed(2)} LANA</span>
+                {frozenCount > 0 && (
+                  <>
+                    <span>•</span>
+                    <Badge variant="destructive" className="gap-1">
+                      <Snowflake className="h-3 w-3" />
+                      {frozenCount} zamrznjenih
+                    </Badge>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Wallets Table */}
+      {isSearching ? (
+        <div className="space-y-2">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      ) : wallets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Denarnice ({wallets.length})</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                  disabled={selectedIds.size === 0 || isUpdating}
+                  onClick={() => handleFreeze(true)}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className="h-4 w-4" />}
+                  Zamrzni ({selectedIds.size})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={selectedIds.size === 0 || isUpdating}
+                  onClick={() => handleFreeze(false)}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sun className="h-4 w-4" />}
+                  Odmrzni ({selectedIds.size})
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={selectedIds.size === wallets.length && wallets.length > 0}
+                        onCheckedChange={selectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Tip</TableHead>
+                    <TableHead>Naslov</TableHead>
+                    <TableHead>Opombe</TableHead>
+                    <TableHead className="text-right">Stanje (LANA)</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wallets.map((w) => (
+                    <TableRow key={w.id} className={w.frozen ? "bg-destructive/5" : ""}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(w.id)}
+                          onCheckedChange={() => toggleSelect(w.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{w.wallet_type}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {w.wallet_id || "N/A"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                        {w.notes || "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {(w.balance ?? 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {w.frozen ? (
+                          <Badge variant="destructive" className="gap-1">
+                            <Snowflake className="h-3 w-3" />
+                            Frozen
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Active</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default FreezeManager;
