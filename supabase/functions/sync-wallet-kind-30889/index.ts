@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       since: sinceTimestamp
     };
 
-    console.log('Fetching KIND 30889 events from last 20 minutes...');
+    console.log(`Fetching KIND 30889 events from last ${lookbackMinutes} minutes...`);
     
     const events = await pool.querySync(relays, filter);
     console.log(`Found ${events.length} events`);
