@@ -136,14 +136,20 @@ const FreezeManager = () => {
       toast.error("Select at least one wallet");
       return;
     }
+    if (!profile) return;
 
     setIsUpdating(true);
     try {
       const ids = Array.from(selectedIds);
-      const { error } = await supabase
-        .from("wallets")
-        .update({ frozen: freeze })
-        .in("id", ids);
+      
+      // Call freeze-wallets edge function (updates DB + broadcasts KIND 30889)
+      const { data, error } = await supabase.functions.invoke("freeze-wallets", {
+        body: {
+          wallet_ids: ids,
+          freeze,
+          nostr_hex_id: profile.nostr_hex_id,
+        },
+      });
 
       if (error) throw error;
 

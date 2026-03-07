@@ -462,13 +462,13 @@ async function handleCheckWallet(
       );
       await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
 
-      // KIND 30889 - Wallet List
+      // KIND 30889 - Wallet List (v1.1 with 7th field freeze_status)
       const event30889 = createSignedEvent(
         30889,
         [
           ["d", nostrHexForProfile],
           ["status", "active"],
-          ["w", wallet_id, resolvedWalletType, "LANA", body.data?.notes || "", "0"]
+          ["w", wallet_id, resolvedWalletType, "LANA", body.data?.notes || "", "0", ""]
         ],
         "",
         privateKeyHex
@@ -708,14 +708,14 @@ async function handleRegisterVirginWallets(
         results.push(walletResult);
       }
 
-      // KIND 30889 - Updated Wallet List
+      // KIND 30889 - Updated Wallet List (v1.1 with 7th field freeze_status)
       const { data: allWallets } = await supabase
         .from("wallets")
-        .select("wallet_id, wallet_type, notes")
+        .select("wallet_id, wallet_type, notes, frozen")
         .eq("main_wallet_id", mainWallet.id);
 
       const walletTags = (allWallets || []).map((w: any) =>
-        ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0"]
+        ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0", w.frozen ? "frozen_l8w" : ""]
       );
 
       const event30889 = createSignedEvent(30889, [
