@@ -149,14 +149,14 @@ Deno.serve(async (req) => {
           "wss://relay.damus.io",
         ];
 
-        // Get all wallets for this user (with updated notes)
+        // Get all wallets for this user (with updated notes, include frozen for 7th field)
         const { data: allWallets } = await supabase
           .from("wallets")
-          .select("wallet_id, wallet_type, notes, amount_unregistered_lanoshi")
+          .select("wallet_id, wallet_type, notes, amount_unregistered_lanoshi, frozen")
           .eq("main_wallet_id", wallet.main_wallet_id);
 
         const walletTags = (allWallets || []).map(w =>
-          ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0)]
+          ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? "frozen_l8w" : ""]
         );
 
         console.log(`[${correlationId}] Creating KIND 30889 with ${walletTags.length} wallet tags`);
