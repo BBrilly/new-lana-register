@@ -140,21 +140,21 @@ Deno.serve(async (req) => {
             .select("wallet_id, wallet_type, notes, amount_unregistered_lanoshi, frozen, freeze_reason")
             .eq("main_wallet_id", mainWallet.id);
 
-          // Check if ANY wallet is frozen → set status to "frozen"
-          const anyFrozen = (allWallets || []).some((w: any) => w.frozen);
+          // Use profile-level status from main_wallets (not derived from individual wallet freezes)
+          const profileStatus = mainWallet.status || "active";
 
           const walletTags = (allWallets || []).map((w: any) =>
             ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? (w.freeze_reason || resolvedFreezeCode) : ""]
           );
 
-          console.log(`[${correlationId}] Creating KIND 30889 with ${walletTags.length} wallet tags, status=${anyFrozen ? "frozen" : "active"}`);
+          console.log(`[${correlationId}] Creating KIND 30889 with ${walletTags.length} wallet tags, status=${profileStatus}`);
 
           const pool = new SimplePool();
           const event30889 = createSignedEvent(
             30889,
             [
               ["d", nostr_hex_id],
-              ["status", anyFrozen ? "frozen" : "active"],
+              ["status", profileStatus],
               ...walletTags,
             ],
             "",
