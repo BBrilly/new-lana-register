@@ -381,6 +381,45 @@ const FreezeManager = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Freeze Reason Dialog */}
+      <Dialog open={freezeDialogOpen} onOpenChange={setFreezeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Snowflake className="h-5 w-5 text-destructive" />
+              Freeze {selectedIds.size} Wallet{selectedIds.size !== 1 ? "s" : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Select the reason for freezing. This will be broadcast via KIND 30889 to all relays.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={freezeReason} onValueChange={setFreezeReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select freeze reason" />
+              </SelectTrigger>
+              <SelectContent>
+                {FREEZE_CODES.map(code => (
+                  <SelectItem key={code.value} value={code.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{code.label}</span>
+                      <span className="text-xs text-muted-foreground">{code.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFreezeDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleFreezeConfirm} className="gap-2">
+              <Snowflake className="h-4 w-4" />
+              Confirm Freeze
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
