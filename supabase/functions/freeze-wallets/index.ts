@@ -137,14 +137,14 @@ Deno.serve(async (req) => {
           // Get all wallets for this user (with updated frozen status)
           const { data: allWallets } = await supabase
             .from("wallets")
-            .select("wallet_id, wallet_type, notes, amount_unregistered_lanoshi, frozen")
+            .select("wallet_id, wallet_type, notes, amount_unregistered_lanoshi, frozen, freeze_reason")
             .eq("main_wallet_id", mainWallet.id);
 
           // Check if ANY wallet is frozen → set status to "frozen"
           const anyFrozen = (allWallets || []).some((w: any) => w.frozen);
 
           const walletTags = (allWallets || []).map((w: any) =>
-            ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? resolvedFreezeCode : ""]
+            ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? (w.freeze_reason || resolvedFreezeCode) : ""]
           );
 
           console.log(`[${correlationId}] Creating KIND 30889 with ${walletTags.length} wallet tags, status=${anyFrozen ? "frozen" : "active"}`);
