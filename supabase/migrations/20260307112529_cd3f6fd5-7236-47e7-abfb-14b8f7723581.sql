@@ -1,0 +1,1 @@
+UPDATE main_wallets SET status = 'active' WHERE status = 'frozen';

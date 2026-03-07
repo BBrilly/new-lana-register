@@ -140,8 +140,9 @@ Deno.serve(async (req) => {
             .select("wallet_id, wallet_type, notes, amount_unregistered_lanoshi, frozen, freeze_reason")
             .eq("main_wallet_id", mainWallet.id);
 
-          // Use profile-level status from main_wallets (not derived from individual wallet freezes)
-          const profileStatus = mainWallet.status || "active";
+          // Per-wallet freeze must NEVER change the profile-level status tag
+          // Profile-level status ("frozen"/"active") is managed separately and independently
+          const profileStatus = "active";
 
           const walletTags = (allWallets || []).map((w: any) =>
             ["w", w.wallet_id || "", w.wallet_type, "LANA", w.notes || "", String(w.amount_unregistered_lanoshi || 0), w.frozen ? (w.freeze_reason || resolvedFreezeCode) : ""]
