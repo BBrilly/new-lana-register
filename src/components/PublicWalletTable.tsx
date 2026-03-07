@@ -94,6 +94,7 @@ const PublicWalletTable = ({
                   </TableHead>
                 )}
                 <TableHead>Wallet ID</TableHead>
+                <TableHead className="text-center">Split</TableHead>
                 <TableHead className="text-right">
                   <Button variant="ghost" size="sm" className="gap-1 -mr-3 font-medium" onClick={() => toggleSort('balance')}>
                     Balance <SortIcon field="balance" />
@@ -104,7 +105,7 @@ const PublicWalletTable = ({
             <TableBody>
               {wallets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={showWalletType ? 5 : 4} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={showWalletType ? 6 : 5} className="text-center text-muted-foreground py-8">
                     {emptyMessage}
                   </TableCell>
                 </TableRow>
@@ -134,6 +135,13 @@ const PublicWalletTable = ({
                               {copiedId === wallet.wallet_id ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
                             </Button>
                           </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {wallet.split_created != null ? (
+                          <Badge variant="outline" className="text-xs font-mono">#{wallet.split_created}</Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
