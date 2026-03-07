@@ -10,6 +10,7 @@ export interface FrozenWalletWithBalance {
   display_name: string | null;
   balance: number;
   nostr_hex_id?: string;
+  split_created: number | null;
 }
 
 export const useFrozenWallets = () => {
