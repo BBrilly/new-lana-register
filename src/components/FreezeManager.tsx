@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Snowflake, Sun, Loader2, User, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,6 +37,14 @@ const FreezeManager = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [freezeDialogOpen, setFreezeDialogOpen] = useState(false);
+  const [freezeReason, setFreezeReason] = useState("frozen_l8w");
+
+  const FREEZE_CODES = [
+    { value: "frozen_l8w", label: "Late Wallet Registration", description: "Frozen due to late wallet registration" },
+    { value: "frozen_max_cap", label: "Maximum Cap Exceeded", description: "Frozen due to maximum balance cap exceeded" },
+    { value: "frozen_too_wild", label: "Suspicious Activity", description: "Frozen due to irregular or suspicious activity" },
+  ];
 
   const handleSearch = async () => {
     const hex = nostrHexInput.trim();
@@ -131,7 +141,45 @@ const FreezeManager = () => {
     }
   };
 
-  const handleFreeze = async (freeze: boolean) => {
+  const handleFreezeClick = () => {
+    if (selectedIds.size === 0) {
+      toast.error("Select at least one wallet");
+      return;
+    }
+    setFreezeDialogOpen(true);
+  };
+
+  const handleFreezeConfirm = async () => {
+    if (!profile) return;
+    setFreezeDialogOpen(false);
+    setIsUpdating(true);
+    try {
+      const ids = Array.from(selectedIds);
+      
+      const { data, error } = await supabase.functions.invoke("freeze-wallets", {
+        body: {
+          wallet_ids: ids,
+          freeze: true,
+          freeze_reason: freezeReason,
+          nostr_hex_id: profile.nostr_hex_id,
+        },
+      });
+
+      if (error) throw error;
+
+      setWallets(prev =>
+        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: true } : w)
+      );
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} frozen (${freezeReason})`);
+    } catch (err: any) {
+      toast.error(err.message || "Error freezing wallets");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUnfreeze = async () => {
     if (selectedIds.size === 0) {
       toast.error("Select at least one wallet");
       return;
@@ -142,25 +190,24 @@ const FreezeManager = () => {
     try {
       const ids = Array.from(selectedIds);
       
-      // Call freeze-wallets edge function (updates DB + broadcasts KIND 30889)
       const { data, error } = await supabase.functions.invoke("freeze-wallets", {
         body: {
           wallet_ids: ids,
-          freeze,
+          freeze: false,
+          freeze_reason: "",
           nostr_hex_id: profile.nostr_hex_id,
         },
       });
 
       if (error) throw error;
 
-      // Update local state
       setWallets(prev =>
-        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: freeze } : w)
+        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: false } : w)
       );
       setSelectedIds(new Set());
-      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} ${freeze ? "frozen" : "unfrozen"}`);
+      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} unfrozen`);
     } catch (err: any) {
-      toast.error(err.message || "Error updating wallets");
+      toast.error(err.message || "Error unfreezing wallets");
     } finally {
       setIsUpdating(false);
     }
@@ -261,7 +308,7 @@ const FreezeManager = () => {
                   size="sm"
                   className="gap-2"
                   disabled={selectedIds.size === 0 || isUpdating}
-                  onClick={() => handleFreeze(true)}
+                  onClick={handleFreezeClick}
                 >
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className="h-4 w-4" />}
                   Freeze ({selectedIds.size})
@@ -271,7 +318,7 @@ const FreezeManager = () => {
                   size="sm"
                   className="gap-2"
                   disabled={selectedIds.size === 0 || isUpdating}
-                  onClick={() => handleFreeze(false)}
+                  onClick={handleUnfreeze}
                 >
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sun className="h-4 w-4" />}
                   Unfreeze ({selectedIds.size})
@@ -334,6 +381,45 @@ const FreezeManager = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Freeze Reason Dialog */}
+      <Dialog open={freezeDialogOpen} onOpenChange={setFreezeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Snowflake className="h-5 w-5 text-destructive" />
+              Freeze {selectedIds.size} Wallet{selectedIds.size !== 1 ? "s" : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Select the reason for freezing. This will be broadcast via KIND 30889 to all relays.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={freezeReason} onValueChange={setFreezeReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select freeze reason" />
+              </SelectTrigger>
+              <SelectContent>
+                {FREEZE_CODES.map(code => (
+                  <SelectItem key={code.value} value={code.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{code.label}</span>
+                      <span className="text-xs text-muted-foreground">{code.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFreezeDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleFreezeConfirm} className="gap-2">
+              <Snowflake className="h-4 w-4" />
+              Confirm Freeze
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
