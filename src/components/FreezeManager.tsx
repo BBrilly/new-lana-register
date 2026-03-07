@@ -141,7 +141,45 @@ const FreezeManager = () => {
     }
   };
 
-  const handleFreeze = async (freeze: boolean) => {
+  const handleFreezeClick = () => {
+    if (selectedIds.size === 0) {
+      toast.error("Select at least one wallet");
+      return;
+    }
+    setFreezeDialogOpen(true);
+  };
+
+  const handleFreezeConfirm = async () => {
+    if (!profile) return;
+    setFreezeDialogOpen(false);
+    setIsUpdating(true);
+    try {
+      const ids = Array.from(selectedIds);
+      
+      const { data, error } = await supabase.functions.invoke("freeze-wallets", {
+        body: {
+          wallet_ids: ids,
+          freeze: true,
+          freeze_reason: freezeReason,
+          nostr_hex_id: profile.nostr_hex_id,
+        },
+      });
+
+      if (error) throw error;
+
+      setWallets(prev =>
+        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: true } : w)
+      );
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} frozen (${freezeReason})`);
+    } catch (err: any) {
+      toast.error(err.message || "Error freezing wallets");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUnfreeze = async () => {
     if (selectedIds.size === 0) {
       toast.error("Select at least one wallet");
       return;
@@ -152,25 +190,24 @@ const FreezeManager = () => {
     try {
       const ids = Array.from(selectedIds);
       
-      // Call freeze-wallets edge function (updates DB + broadcasts KIND 30889)
       const { data, error } = await supabase.functions.invoke("freeze-wallets", {
         body: {
           wallet_ids: ids,
-          freeze,
+          freeze: false,
+          freeze_reason: "",
           nostr_hex_id: profile.nostr_hex_id,
         },
       });
 
       if (error) throw error;
 
-      // Update local state
       setWallets(prev =>
-        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: freeze } : w)
+        prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: false } : w)
       );
       setSelectedIds(new Set());
-      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} ${freeze ? "frozen" : "unfrozen"}`);
+      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} unfrozen`);
     } catch (err: any) {
-      toast.error(err.message || "Error updating wallets");
+      toast.error(err.message || "Error unfreezing wallets");
     } finally {
       setIsUpdating(false);
     }
