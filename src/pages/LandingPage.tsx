@@ -32,6 +32,7 @@ interface WalletWithBalance {
   display_name: string | null;
   balance: number;
   freeze_reason?: string;
+  split_created?: number | null;
 }
 
 const FREEZE_LABELS: Record<string, string> = {
@@ -295,6 +296,7 @@ const LandingPage = () => {
                 id,
                 wallet_id,
                 wallet_type,
+                split_created,
                 main_wallet:main_wallets(name, display_name)
               `)
               .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder', 'LanaPays.Us', 'Lana.Discount'])
@@ -390,6 +392,7 @@ const LandingPage = () => {
           name: (wallet.main_wallet as any)?.name || null,
           display_name: (wallet.main_wallet as any)?.display_name || null,
           balance: balanceMap.get(wallet.wallet_id || '') || 0,
+          split_created: (wallet as any).split_created ?? null,
         }));
 
         setWalletBalances(walletsWithBalances);
@@ -1677,6 +1680,7 @@ const LandingPage = () => {
                           </Button>
                         </TableHead>
                         <TableHead>Wallet ID</TableHead>
+                        <TableHead className="text-center">Split</TableHead>
                         <TableHead className="text-right">
                           <Button 
                             variant="ghost" 
@@ -1702,7 +1706,7 @@ const LandingPage = () => {
                     <TableBody>
                       {sortedLanaPayUsWallets.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                             No LanaPays.Us wallets found
                           </TableCell>
                         </TableRow>
@@ -1732,6 +1736,13 @@ const LandingPage = () => {
                                     )}
                                   </Button>
                                 </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {wallet.split_created != null ? (
+                                <Badge variant="outline" className="text-xs font-mono">#{wallet.split_created}</Badge>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
                               )}
