@@ -392,6 +392,7 @@ const LandingPage = () => {
           name: (wallet.main_wallet as any)?.name || null,
           display_name: (wallet.main_wallet as any)?.display_name || null,
           balance: balanceMap.get(wallet.wallet_id || '') || 0,
+          split_created: (wallet as any).split_created ?? null,
         }));
 
         setWalletBalances(walletsWithBalances);
