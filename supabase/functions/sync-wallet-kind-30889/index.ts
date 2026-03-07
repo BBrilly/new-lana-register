@@ -75,16 +75,26 @@ Deno.serve(async (req) => {
     // Create Nostr pool
     const pool = new SimplePool();
 
-    // Query events from last 20 minutes
-    const twentyMinutesAgo = Math.floor(Date.now() / 1000) - (20 * 60);
+    // Parse optional lookback parameter (in minutes), default 20 minutes
+    let lookbackMinutes = 20;
+    try {
+      const body = await req.json();
+      if (body?.lookback_minutes && typeof body.lookback_minutes === 'number') {
+        lookbackMinutes = body.lookback_minutes;
+      }
+    } catch {
+      // No body or invalid JSON, use default
+    }
+
+    const sinceTimestamp = Math.floor(Date.now() / 1000) - (lookbackMinutes * 60);
     
     const filter: Filter = {
       kinds: [30889],
       authors: registrarPubkeys,
-      since: twentyMinutesAgo
+      since: sinceTimestamp
     };
 
-    console.log('Fetching KIND 30889 events from last 20 minutes...');
+    console.log(`Fetching KIND 30889 events from last ${lookbackMinutes} minutes...`);
     
     const events = await pool.querySync(relays, filter);
     console.log(`Found ${events.length} events`);
