@@ -523,6 +523,7 @@ export type Database = {
         Row: {
           amount_unregistered_lanoshi: number | null
           created_at: string
+          freeze_reason: string
           frozen: boolean
           id: string
           main_wallet_id: string
@@ -535,6 +536,7 @@ export type Database = {
         Insert: {
           amount_unregistered_lanoshi?: number | null
           created_at?: string
+          freeze_reason?: string
           frozen?: boolean
           id?: string
           main_wallet_id: string
@@ -547,6 +549,7 @@ export type Database = {
         Update: {
           amount_unregistered_lanoshi?: number | null
           created_at?: string
+          freeze_reason?: string
           frozen?: boolean
           id?: string
           main_wallet_id?: string

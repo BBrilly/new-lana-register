@@ -1,0 +1,1 @@
+ALTER TABLE public.wallets ADD COLUMN freeze_reason text DEFAULT '' NOT NULL;
