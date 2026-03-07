@@ -60,6 +60,7 @@ export const useFrozenWallets = () => {
             display_name: (w.main_wallet as any)?.display_name || null,
             balance: 0,
             nostr_hex_id: (w.main_wallet as any)?.nostr_hex_id || undefined,
+            split_created: (w as any).split_created ?? null,
           })));
           return;
         }
@@ -101,6 +102,7 @@ export const useFrozenWallets = () => {
           display_name: (w.main_wallet as any)?.display_name || null,
           balance: balanceMap.get(w.wallet_id || '') || 0,
           nostr_hex_id: (w.main_wallet as any)?.nostr_hex_id || undefined,
+          split_created: (w as any).split_created ?? null,
         })));
       } catch (err) {
         console.error('Error loading frozen wallets:', err);
