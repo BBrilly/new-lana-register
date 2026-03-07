@@ -166,7 +166,8 @@ const ApiDocs = () => {
     "wallet_id": "LWalletAddress123456789012345678",
     "wallet_type": "Main Wallet",
     "main_wallet_id": "550e8400-e29b-41d4-a716-446655440000",
-    "created_at": "2025-06-15T10:30:00.000Z"
+    "created_at": "2025-06-15T10:30:00.000Z",
+    "frozen": false
   },
   "correlation_id": "uuid-string"
 }`;
@@ -626,7 +627,11 @@ const ApiDocs = () => {
                 <ul className="mt-3 space-y-2 text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
-                    Returns wallet metadata (type, main_wallet_id, created_at) if registered
+                    Returns wallet metadata (type, main_wallet_id, created_at, frozen) if registered
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    Returns <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">frozen: true/false</code> to indicate if the wallet is frozen
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
