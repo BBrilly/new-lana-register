@@ -69,8 +69,8 @@ const Login = () => {
         description: `Welcome back, ${profile.display_name || profile.name}!`,
       });
 
-      // Redirect to dashboard
-      navigate("/dashboard");
+      // Redirect to wallets
+      navigate("/wallets");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Invalid WIF key";
       setError(errorMessage);
