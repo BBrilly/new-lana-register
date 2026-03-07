@@ -694,6 +694,176 @@ const ApiDocs = () => {
           </Card>
         </div>
 
+        {/* ========== KIND 30889 v1.1 Developer Notice ========== */}
+        <Card className="mb-8 border-primary/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Badge className="bg-primary text-primary-foreground">v1.1</Badge>
+              <CardTitle>KIND 30889 — Per-Wallet Freeze Support</CardTitle>
+            </div>
+            <CardDescription>
+              Backward-compatible update to the Registrar Wallet List event format
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Summary */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Summary</h4>
+              <p className="text-muted-foreground">
+                KIND 30889 has been extended with optional per-wallet freeze functionality. 
+                The change is <strong>fully backward compatible</strong> — existing implementations continue to work without modification.
+              </p>
+            </div>
+
+            {/* What Changed */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">What Changed</h4>
+              <ul className="space-y-2 text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1">•</span>
+                  The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">status</code> tag now accepts a new value: <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">frozen</code> (freezes all wallets for that customer)
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1">•</span>
+                  The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">w</code> tag has an <strong>optional 7th field</strong>: <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">freeze_status</code>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1">•</span>
+                  Old <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">w</code> tags with 6 fields remain valid and fully supported
+                </li>
+              </ul>
+            </div>
+
+            {/* Freeze Status Codes */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Freeze Status Codes</h4>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Meaning</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-mono text-sm"><code>""</code> (empty string)</TableCell>
+                      <TableCell className="text-muted-foreground">Normal, unfrozen</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-mono text-sm"><code>frozen_l8w</code></TableCell>
+                      <TableCell className="text-muted-foreground">Frozen due to late wallet registration</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-mono text-sm"><code>frozen_max_cap</code></TableCell>
+                      <TableCell className="text-muted-foreground">Frozen due to maximum balance cap exceeded</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-mono text-sm"><code>frozen_too_wild</code></TableCell>
+                      <TableCell className="text-muted-foreground">Frozen due to irregular or suspicious activity</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* W Tag Format */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Updated W Tag Format</h4>
+              <CodeBlock 
+                code={`// v1.0 (still valid):
+["w", "wallet_id", "wallet_type", "LANA", "notes", "amount"]
+
+// v1.1 (with freeze_status):
+["w", "wallet_id", "wallet_type", "LANA", "notes", "amount", "freeze_status"]
+
+// Examples:
+["w", "Labc123...", "Main Wallet", "LANA", "My wallet", "0", ""]           // unfrozen
+["w", "Lxyz789...", "Wallet",      "LANA", "",          "0", "frozen_l8w"]  // frozen`}
+                sectionId="kind30889-wtag-format"
+              />
+            </div>
+
+            {/* Who Needs to Update */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Who Needs to Update</h4>
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="font-medium text-foreground">Registrar Software</p>
+                  <p className="text-sm text-muted-foreground">Must write the 7th field using only the three defined freeze codes, and/or set <code className="px-1 py-0.5 rounded bg-muted">status: frozen</code> when freezing at customer level.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="font-medium text-foreground">User Wallets / Dashboards</p>
+                  <p className="text-sm text-muted-foreground">Should read the 7th field and display the freeze reason. If not updated, wallets appear normal (no crash).</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="font-medium text-foreground">Monitoring Services</p>
+                  <p className="text-sm text-muted-foreground">Should detect frozen wallets by freeze code and suppress or flag alerts accordingly.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="font-medium text-foreground">Providers / Relays</p>
+                  <p className="text-sm text-muted-foreground">No update required — pass-through behavior unchanged.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Migration Guide */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Migration Guide</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2"><span className="text-primary mt-1">•</span>No breaking changes, no re-indexing required</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1">•</span>Check if <code className="px-1 py-0.5 rounded bg-muted">w</code> tag array length ≥ 7, read index 6 as <code className="px-1 py-0.5 rounded bg-muted">freeze_status</code></li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1">•</span>Treat missing or empty 7th field as normal (unfrozen) state</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1">•</span><strong>Any unrecognized <code className="px-1 py-0.5 rounded bg-muted">freeze_status</code> value must be treated as frozen (fail-safe default)</strong></li>
+              </ul>
+            </div>
+
+            {/* Code Examples */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Code Examples</h4>
+              <CodeBlock
+                code={`// Reading freeze_status safely (backward compatible)
+function getFreezeStatus(wTag) {
+  // wTag = ["w", wallet_id, type, currency, notes, amount, freeze_status?]
+  if (wTag.length < 7 || wTag[6] === "") {
+    return { frozen: false, reason: null };
+  }
+  
+  const KNOWN_CODES = ["frozen_l8w", "frozen_max_cap", "frozen_too_wild"];
+  const code = wTag[6];
+  
+  // Fail-safe: unknown codes are still treated as frozen
+  return {
+    frozen: true,
+    reason: KNOWN_CODES.includes(code) ? code : "unknown_freeze_code"
+  };
+}
+
+// Writing a w tag with freeze_status
+const frozenWallet = ["w", "Labc123...", "Main Wallet", "LANA", "notes", "0", "frozen_l8w"];
+const normalWallet = ["w", "Lxyz789...", "Wallet", "LANA", "", "0", ""];
+
+// Checking customer-level status tag
+const statusTag = event.tags.find(t => t[0] === "status");
+if (statusTag && statusTag[1] === "frozen") {
+  // All wallets for this customer are frozen
+}`}
+                sectionId="kind30889-code-examples"
+                label="JavaScript — Read & Write Examples"
+              />
+            </div>
+
+            {/* Version Note */}
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-sm text-muted-foreground">
+                <strong>Version:</strong> KIND 30889 v1.1 &nbsp;|&nbsp; 
+                <strong>Effective:</strong> March 2026 &nbsp;|&nbsp; 
+                <strong>Compatibility:</strong> Full backward compatibility with v1.0
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Error Codes */}
         <Card className="mb-8">
           <CardHeader>
