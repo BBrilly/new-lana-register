@@ -1,0 +1,1 @@
+ALTER TABLE public.wallets ADD COLUMN split_created integer DEFAULT NULL;

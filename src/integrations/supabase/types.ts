@@ -529,6 +529,7 @@ export type Database = {
           main_wallet_id: string
           notes: string | null
           registration_source: string | null
+          split_created: number | null
           updated_at: string
           wallet_id: string | null
           wallet_type: string
@@ -542,6 +543,7 @@ export type Database = {
           main_wallet_id: string
           notes?: string | null
           registration_source?: string | null
+          split_created?: number | null
           updated_at?: string
           wallet_id?: string | null
           wallet_type: string
@@ -555,6 +557,7 @@ export type Database = {
           main_wallet_id?: string
           notes?: string | null
           registration_source?: string | null
+          split_created?: number | null
           updated_at?: string
           wallet_id?: string | null
           wallet_type?: string
