@@ -7,6 +7,7 @@ export interface Wallet {
   eurAmount: number;
   events: WalletEvent[];
   notification?: WalletNotification;
+  splitCreated?: number | null;
 }
 
 export interface WalletEvent {
