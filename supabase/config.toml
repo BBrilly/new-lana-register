@@ -42,5 +42,8 @@ verify_jwt = false
 [functions.update-wallet-notes]
 verify_jwt = false
 
+[functions.freeze-wallets]
+verify_jwt = false
+
 [functions.check]
 verify_jwt = false

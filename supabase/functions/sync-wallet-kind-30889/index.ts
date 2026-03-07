@@ -12,6 +12,7 @@ interface WalletTag {
   currency: string;
   note: string;
   amount_unregistered_lanoshi: number;
+  freeze_status: string;
 }
 
 interface ParsedEvent {
@@ -161,11 +162,11 @@ function parseKind30889Events(events: Event[]): ParsedEvent[] {
       const customer_pubkey = dTag[1];
       const status = statusTag[1];
 
-      // Parse wallet tags
+      // Parse wallet tags (6 or 7 fields supported)
       const wallets: WalletTag[] = [];
       for (const wTag of wTags) {
-        if (wTag.length !== 6) {
-          console.warn(`Invalid w tag format in event ${event.id}`);
+        if (wTag.length < 6) {
+          console.warn(`Invalid w tag format in event ${event.id} (${wTag.length} fields)`);
           continue;
         }
 
@@ -174,7 +175,8 @@ function parseKind30889Events(events: Event[]): ParsedEvent[] {
           wallet_type: wTag[2],
           currency: wTag[3],
           note: wTag[4] || '',
-          amount_unregistered_lanoshi: parseInt(wTag[5]) || 0
+          amount_unregistered_lanoshi: parseInt(wTag[5]) || 0,
+          freeze_status: wTag.length >= 7 ? (wTag[6] || '') : ''
         });
       }
 
@@ -259,8 +261,12 @@ async function syncWallets(supabase: any, parsed: ParsedEvent) {
     }
   }
 
-  // UPSERT all wallets (including Main)
+  // UPSERT all wallets (including Main) — includes freeze_status from 7th field
   for (const wallet of wallets) {
+    // Determine frozen status from freeze_status field
+    // Empty string = not frozen, any known or unknown freeze code = frozen (fail-safe)
+    const isFrozen = wallet.freeze_status !== '';
+
     const { error: walletError } = await supabase
       .from('wallets')
       .upsert({
@@ -269,6 +275,7 @@ async function syncWallets(supabase: any, parsed: ParsedEvent) {
         wallet_type: wallet.wallet_type,
         notes: wallet.note,
         amount_unregistered_lanoshi: wallet.amount_unregistered_lanoshi,
+        frozen: isFrozen,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'wallet_id',
