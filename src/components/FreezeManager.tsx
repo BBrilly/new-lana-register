@@ -39,7 +39,7 @@ const FreezeManager = () => {
   const handleSearch = async () => {
     const hex = nostrHexInput.trim();
     if (!hex || hex.length !== 64) {
-      toast.error("Nostr Hex ID mora biti 64 znakov");
+      toast.error("Nostr Hex ID must be 64 characters");
       return;
     }
 
@@ -59,7 +59,7 @@ const FreezeManager = () => {
 
       if (mwError) throw mwError;
       if (!mainWallet) {
-        setSearchError("Profil s tem Nostr Hex ID ni bil najden");
+        setSearchError("No profile found with this Nostr Hex ID");
         return;
       }
 
@@ -109,7 +109,7 @@ const FreezeManager = () => {
       setWallets(walletRows);
     } catch (err: any) {
       console.error("Search error:", err);
-      setSearchError(err.message || "Napaka pri iskanju");
+      setSearchError(err.message || "Error during search");
     } finally {
       setIsSearching(false);
     }
@@ -133,7 +133,7 @@ const FreezeManager = () => {
 
   const handleFreeze = async (freeze: boolean) => {
     if (selectedIds.size === 0) {
-      toast.error("Izberite vsaj eno denarnico");
+      toast.error("Select at least one wallet");
       return;
     }
 
@@ -152,9 +152,9 @@ const FreezeManager = () => {
         prev.map(w => selectedIds.has(w.id) ? { ...w, frozen: freeze } : w)
       );
       setSelectedIds(new Set());
-      toast.success(`${ids.length} denarnic${ids.length === 1 ? "a" : ""} ${freeze ? "zamrznjenih" : "odmrznjenih"}`);
+      toast.success(`${ids.length} wallet${ids.length === 1 ? "" : "s"} ${freeze ? "frozen" : "unfrozen"}`);
     } catch (err: any) {
-      toast.error(err.message || "Napaka pri posodabljanju");
+      toast.error(err.message || "Error updating wallets");
     } finally {
       setIsUpdating(false);
     }
@@ -173,13 +173,13 @@ const FreezeManager = () => {
             Freeze / Unfreeze Wallets
           </CardTitle>
           <CardDescription>
-            Vnesite Nostr Hex ID za prikaz profila in denarnic. Nato izberite denarnice za zamrznitev ali odmrznitev.
+            Enter a Nostr Hex ID to display the profile and wallets. Then select wallets to freeze or unfreeze.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
             <Input
-              placeholder="Nostr Hex ID (64 znakov)"
+              placeholder="Nostr Hex ID (64 characters)"
               value={nostrHexInput}
               onChange={(e) => setNostrHexInput(e.target.value)}
               className="font-mono text-sm"
@@ -187,7 +187,7 @@ const FreezeManager = () => {
             />
             <Button onClick={handleSearch} disabled={isSearching} className="gap-2 shrink-0">
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              Išči
+              Search
             </Button>
           </div>
 
@@ -219,7 +219,7 @@ const FreezeManager = () => {
                 <p className="font-mono text-xs text-muted-foreground truncate">{profile.nostr_hex_id}</p>
               </div>
               <div className="ml-auto flex gap-3 text-sm text-muted-foreground">
-                <span>{wallets.length} denarnic</span>
+                <span>{wallets.length} wallets</span>
                 <span>•</span>
                 <span>{totalBalance.toFixed(2)} LANA</span>
                 {frozenCount > 0 && (
@@ -227,7 +227,7 @@ const FreezeManager = () => {
                     <span>•</span>
                     <Badge variant="destructive" className="gap-1">
                       <Snowflake className="h-3 w-3" />
-                      {frozenCount} zamrznjenih
+                      {frozenCount} frozen
                     </Badge>
                   </>
                 )}
@@ -248,7 +248,7 @@ const FreezeManager = () => {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Denarnice ({wallets.length})</CardTitle>
+              <CardTitle className="text-base">Wallets ({wallets.length})</CardTitle>
               <div className="flex gap-2">
                 <Button
                   variant="destructive"
@@ -258,7 +258,7 @@ const FreezeManager = () => {
                   onClick={() => handleFreeze(true)}
                 >
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className="h-4 w-4" />}
-                  Zamrzni ({selectedIds.size})
+                  Freeze ({selectedIds.size})
                 </Button>
                 <Button
                   variant="outline"
@@ -268,7 +268,7 @@ const FreezeManager = () => {
                   onClick={() => handleFreeze(false)}
                 >
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sun className="h-4 w-4" />}
-                  Odmrzni ({selectedIds.size})
+                  Unfreeze ({selectedIds.size})
                 </Button>
               </div>
             </div>
@@ -284,11 +284,11 @@ const FreezeManager = () => {
                         onCheckedChange={selectAll}
                       />
                     </TableHead>
-                    <TableHead>Tip</TableHead>
-                    <TableHead>Naslov</TableHead>
-                    <TableHead>Opombe</TableHead>
-                    <TableHead className="text-right">Stanje (LANA)</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
+                     <TableHead>Type</TableHead>
+                     <TableHead>Address</TableHead>
+                     <TableHead>Notes</TableHead>
+                     <TableHead className="text-right">Balance (LANA)</TableHead>
+                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
