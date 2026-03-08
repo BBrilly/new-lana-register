@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import React, { useEffect, useState, useMemo } from "react";
 import { NostrClient, SystemParameters, RelayStatus, getStoredParameters, getStoredRelayStatuses } from "@/utils/nostrClient";
@@ -1174,7 +1175,7 @@ const LandingPage = () => {
                         paginatedNostrEvents.map((event, index) => (
                           <React.Fragment key={event.id}>
                             <TableRow 
-                              className="cursor-pointer hover:bg-muted/50"
+                              className={cn("cursor-pointer hover:bg-muted/50", event.walletId && deletedWalletIds.has(event.walletId) && "bg-muted/40 opacity-70")}
                               onClick={() => handleExpandEvent(event.id, event.id)}
                             >
                               <TableCell className="font-medium">
@@ -1235,7 +1236,11 @@ const LandingPage = () => {
                                 {formatDistanceToNow(new Date(event.createdAt * 1000), { addSuffix: true })}
                               </TableCell>
                               <TableCell>
-                                {event.isReturned ? (
+                                {event.walletId && deletedWalletIds.has(event.walletId) ? (
+                                  <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
+                                    Deleted
+                                  </Badge>
+                                ) : event.isReturned ? (
                                   <Badge variant="default" className="bg-green-500/20 text-green-600 border-green-500/30">
                                     <Check className="h-3 w-3 mr-1" />
                                     Returned
