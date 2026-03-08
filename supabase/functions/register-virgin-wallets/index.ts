@@ -741,6 +741,165 @@ async function handleRegisterVirginWallets(
   return { insertedWallets, results, successfulBroadcasts, failedBroadcasts, nostr_id_hex };
 }
 
+// ============================================
+// HANDLER: register_wallet_with_registered_lanas
+// ============================================
+async function handleRegisterWithRegisteredLanas(
+  supabase: any,
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  body: any,
+  correlationId: string
+) {
+  const { nostr_id_hex, wallet_id, wallet_type, notes } = body.data || {};
+
+  if (!isValidNostrHex(nostr_id_hex)) {
+    return new Response(
+      JSON.stringify({ success: false, status: "error", error: "Invalid nostr_id_hex format", correlation_id: correlationId }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (!wallet_id || !isValidLanaAddress(wallet_id)) {
+    return new Response(
+      JSON.stringify({ success: false, status: "error", error: "Invalid wallet address format", correlation_id: correlationId }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Check if profile exists
+  const { data: mainWallet, error: mainWalletError } = await supabase
+    .from("main_wallets")
+    .select("id, nostr_hex_id, name, wallet_id")
+    .eq("nostr_hex_id", nostr_id_hex)
+    .maybeSingle();
+
+  if (mainWalletError || !mainWallet) {
+    return new Response(
+      JSON.stringify({ success: false, status: "not_found", error: `Profile not found for nostr_id_hex: ${nostr_id_hex}`, correlation_id: correlationId }),
+      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Check for duplicates
+  const { data: existingWallet } = await supabase
+    .from("wallets")
+    .select("wallet_id")
+    .eq("wallet_id", wallet_id)
+    .maybeSingle();
+
+  if (existingWallet) {
+    return new Response(
+      JSON.stringify({ success: false, status: "duplicate", error: "Wallet is already registered", correlation_id: correlationId }),
+      { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Get system parameters
+  const sysParams = await getSystemParams(supabase, correlationId);
+  if (!sysParams) {
+    return new Response(
+      JSON.stringify({ success: false, status: "error", error: "System parameters not found", correlation_id: correlationId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Validate wallet types
+  const { data: walletTypes } = await supabase.from("wallet_types").select("name");
+  const validTypes = new Set(walletTypes?.map((t: any) => t.name) || ["Wallet"]);
+  const resolvedWalletType = validTypes.has(wallet_type || "") ? wallet_type : "Wallet";
+
+  // Insert wallet
+  const { data: insertedWallet, error: insertError } = await supabase
+    .from("wallets")
+    .insert({
+      main_wallet_id: mainWallet.id,
+      wallet_id: wallet_id,
+      wallet_type: resolvedWalletType,
+      notes: notes || null,
+      registration_source: "api_registered_lanas"
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error(`[${correlationId}] Error inserting wallet:`, insertError);
+    return new Response(
+      JSON.stringify({ success: false, status: "error", error: "Failed to register wallet", correlation_id: correlationId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log(`[${correlationId}] Inserted wallet with registered Lanas: ${insertedWallet.id}`);
+
+  // Nostr broadcasting
+  const nostrKey = await getNostrSigningKey(supabase, correlationId);
+  let successfulBroadcasts = 0;
+  let failedBroadcasts = 0;
+  const walletResult: WalletResult = {
+    wallet_id: wallet_id,
+    wallet_type: resolvedWalletType,
+    nostr_broadcast: "success",
+    nostr_event_ids: {}
+  };
+
+  if (nostrKey) {
+    const pool = new SimplePool();
+    const { privateKeyHex, registrarPubkey } = nostrKey;
+    const timestamp = new Date().toISOString();
+
+    try {
+      // KIND 87002 - Registration Confirmation
+      const event87002 = createSignedEvent(87002, [
+        ["L", "lana-registry"],
+        ["l", "registration-confirmation", "lana-registry"],
+        ["wallet", wallet_id],
+        ["p", nostr_id_hex],
+        ["status", "confirmed"],
+        ["wallet_type", resolvedWalletType],
+        ["registration_source", "api_registered_lanas"],
+        ["is_virgin", "false"],
+        ["registered_at", timestamp]
+      ], `Wallet ${wallet_id} registered with registered Lanas`, privateKeyHex);
+
+      const result87002 = await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
+      if (result87002.success) {
+        walletResult.nostr_event_ids!.kind_87002 = result87002.eventId;
+        successfulBroadcasts++;
+      } else {
+        failedBroadcasts++;
+        walletResult.nostr_broadcast = "failed";
+      }
+
+      // KIND 30889 - Updated Wallet List
+      const { data: allWallets } = await supabase
+        .from("wallets")
+        .select("wallet_id, wallet_type, notes, frozen")
+        .eq("main_wallet_id", mainWallet.id);
+
+      const walletTags = (allWallets || []).map((w: any) =>
+        ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0", w.frozen ? "frozen_l8w" : ""]
+      );
+
+      const event30889 = createSignedEvent(30889, [
+        ["d", nostr_id_hex],
+        ["status", "active"],
+        ...walletTags
+      ], "", privateKeyHex);
+
+      await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      pool.close(sysParams.relays);
+    } catch (error) {
+      console.error(`[${correlationId}] Error in Nostr broadcasting:`, error);
+      walletResult.nostr_broadcast = "failed";
+    }
+  }
+
+  return { walletResult, successfulBroadcasts, failedBroadcasts, nostr_id_hex };
+}
+
 // ========================
 // MAIN HANDLER
 // ========================
@@ -797,12 +956,32 @@ Deno.serve(async (req) => {
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    } else if (method === "register_wallet_with_registered_lanas") {
+      const result = await handleRegisterWithRegisteredLanas(supabase, supabaseUrl, supabaseServiceKey, body, correlationId);
+      if (result instanceof Response) return result;
+
+      const processingTime = Date.now() - startTime;
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: "ok",
+          message: `Successfully registered wallet with registered Lanas`,
+          data: {
+            nostr_id_hex: result.nostr_id_hex,
+            wallet: result.walletResult,
+            nostr_broadcasts: { successful: result.successfulBroadcasts, failed: result.failedBroadcasts }
+          },
+          processing_time_ms: processingTime,
+          correlation_id: correlationId
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     } else {
       return new Response(
         JSON.stringify({
           success: false,
           status: "error",
-          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user`,
+          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user, register_wallet_with_registered_lanas`,
           correlation_id: correlationId
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
