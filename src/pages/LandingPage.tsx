@@ -119,10 +119,31 @@ const LandingPage = () => {
   }, []);
 
   // Fetch deleted wallet IDs for cross-referencing
+  // A wallet is considered "deleted" if it's in deleted_wallets OR if it no longer exists in wallets table
   useEffect(() => {
     const loadDeletedWallets = async () => {
-      const { data } = await supabase.from('deleted_wallets').select('wallet_id');
-      setDeletedWalletIds(new Set(data?.map(dw => dw.wallet_id).filter(Boolean) as string[] || []));
+      // Fetch explicitly deleted wallets
+      const { data: deletedData } = await supabase.from('deleted_wallets').select('wallet_id');
+      const explicitlyDeleted = new Set(deletedData?.map(dw => dw.wallet_id).filter(Boolean) as string[] || []);
+
+      // Fetch all existing wallet addresses to detect implicitly deleted ones
+      const allExisting = new Set<string>();
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data } = await supabase.from('wallets').select('wallet_id').range(offset, offset + PAGE_SIZE - 1);
+        if (!data || data.length === 0) { hasMore = false; }
+        else {
+          data.forEach(w => { if (w.wallet_id) allExisting.add(w.wallet_id); });
+          hasMore = data.length === PAGE_SIZE;
+          offset += PAGE_SIZE;
+        }
+      }
+
+      // We'll store existing wallet IDs so we can check if an event's wallet is missing
+      setExistingWalletIds(allExisting);
+      setDeletedWalletIds(explicitlyDeleted);
     };
     loadDeletedWallets();
   }, []);
