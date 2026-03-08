@@ -70,6 +70,7 @@ const LandingPage = () => {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [eventNotes, setEventNotes] = useState<Record<string, string | null>>({});
   const [deletedWalletIds, setDeletedWalletIds] = useState<Set<string>>(new Set());
+  const [existingWalletIds, setExistingWalletIds] = useState<Set<string>>(new Set());
 
   // Registered Lana Events (Knights transactions) state
   const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
