@@ -724,6 +724,15 @@ const LandingPage = () => {
     }
   };
 
+  // Check if a wallet is deleted (explicitly in deleted_wallets OR no longer exists in wallets table)
+  const isWalletDeleted = (walletId: string | undefined): boolean => {
+    if (!walletId) return false;
+    if (deletedWalletIds.has(walletId)) return true;
+    // If we have loaded existing wallets and this one isn't there, it's been deleted
+    if (existingWalletIds.size > 0 && !existingWalletIds.has(walletId)) return true;
+    return false;
+  };
+
   const copyWalletId = (walletId: string) => {
     navigator.clipboard.writeText(walletId);
     setCopiedId(walletId);
