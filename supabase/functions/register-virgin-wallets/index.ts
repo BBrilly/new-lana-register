@@ -797,12 +797,32 @@ Deno.serve(async (req) => {
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    } else if (method === "register_wallet_with_registered_lanas") {
+      const result = await handleRegisterWithRegisteredLanas(supabase, supabaseUrl, supabaseServiceKey, body, correlationId);
+      if (result instanceof Response) return result;
+
+      const processingTime = Date.now() - startTime;
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: "ok",
+          message: `Successfully registered wallet with registered Lanas`,
+          data: {
+            nostr_id_hex: result.nostr_id_hex,
+            wallet: result.walletResult,
+            nostr_broadcasts: { successful: result.successfulBroadcasts, failed: result.failedBroadcasts }
+          },
+          processing_time_ms: processingTime,
+          correlation_id: correlationId
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     } else {
       return new Response(
         JSON.stringify({
           success: false,
           status: "error",
-          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user`,
+          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user, register_wallet_with_registered_lanas`,
           correlation_id: correlationId
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
