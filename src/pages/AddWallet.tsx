@@ -357,7 +357,7 @@ const AddWallet = () => {
             data: {
               nostr_id_hex: session.nostrHexId,
               wallet_id: walletNumber,
-              wallet_type: type,
+              wallet_type: "Wallet",
               notes: description
             }
           }
