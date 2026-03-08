@@ -641,7 +641,7 @@ const AddWallet = () => {
                 </div>
               )}
 
-              {renderTypeAndDescription()}
+              {renderTypeAndDescription(true)}
 
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => navigate("/wallets")} disabled={isScanning}>Cancel</Button>
