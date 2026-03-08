@@ -70,6 +70,7 @@ const LandingPage = () => {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [eventNotes, setEventNotes] = useState<Record<string, string | null>>({});
   const [deletedWalletIds, setDeletedWalletIds] = useState<Set<string>>(new Set());
+  const [existingWalletIds, setExistingWalletIds] = useState<Set<string>>(new Set());
 
   // Registered Lana Events (Knights transactions) state
   const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
@@ -119,10 +120,31 @@ const LandingPage = () => {
   }, []);
 
   // Fetch deleted wallet IDs for cross-referencing
+  // A wallet is considered "deleted" if it's in deleted_wallets OR if it no longer exists in wallets table
   useEffect(() => {
     const loadDeletedWallets = async () => {
-      const { data } = await supabase.from('deleted_wallets').select('wallet_id');
-      setDeletedWalletIds(new Set(data?.map(dw => dw.wallet_id).filter(Boolean) as string[] || []));
+      // Fetch explicitly deleted wallets
+      const { data: deletedData } = await supabase.from('deleted_wallets').select('wallet_id');
+      const explicitlyDeleted = new Set(deletedData?.map(dw => dw.wallet_id).filter(Boolean) as string[] || []);
+
+      // Fetch all existing wallet addresses to detect implicitly deleted ones
+      const allExisting = new Set<string>();
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data } = await supabase.from('wallets').select('wallet_id').range(offset, offset + PAGE_SIZE - 1);
+        if (!data || data.length === 0) { hasMore = false; }
+        else {
+          data.forEach(w => { if (w.wallet_id) allExisting.add(w.wallet_id); });
+          hasMore = data.length === PAGE_SIZE;
+          offset += PAGE_SIZE;
+        }
+      }
+
+      // We'll store existing wallet IDs so we can check if an event's wallet is missing
+      setExistingWalletIds(allExisting);
+      setDeletedWalletIds(explicitlyDeleted);
     };
     loadDeletedWallets();
   }, []);
@@ -702,6 +724,15 @@ const LandingPage = () => {
     }
   };
 
+  // Check if a wallet is deleted (explicitly in deleted_wallets OR no longer exists in wallets table)
+  const isWalletDeleted = (walletId: string | undefined): boolean => {
+    if (!walletId) return false;
+    if (deletedWalletIds.has(walletId)) return true;
+    // If we have loaded existing wallets and this one isn't there, it's been deleted
+    if (existingWalletIds.size > 0 && !existingWalletIds.has(walletId)) return true;
+    return false;
+  };
+
   const copyWalletId = (walletId: string) => {
     navigator.clipboard.writeText(walletId);
     setCopiedId(walletId);
@@ -1175,7 +1206,7 @@ const LandingPage = () => {
                         paginatedNostrEvents.map((event, index) => (
                           <React.Fragment key={event.id}>
                             <TableRow 
-                              className={cn("cursor-pointer hover:bg-muted/50", event.walletId && deletedWalletIds.has(event.walletId) && "bg-muted/40 opacity-70")}
+                              className={cn("cursor-pointer hover:bg-muted/50", isWalletDeleted(event.walletId) && "bg-muted/40 opacity-70")}
                               onClick={() => handleExpandEvent(event.id, event.id)}
                             >
                               <TableCell className="font-medium">
@@ -1224,7 +1255,7 @@ const LandingPage = () => {
                                       <Copy className="h-3 w-3" />
                                     </Button>
                                   )}
-                                  {event.walletId && deletedWalletIds.has(event.walletId) && (
+                                  {isWalletDeleted(event.walletId) && (
                                     <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Deleted</Badge>
                                   )}
                                 </div>
@@ -1236,7 +1267,7 @@ const LandingPage = () => {
                                 {formatDistanceToNow(new Date(event.createdAt * 1000), { addSuffix: true })}
                               </TableCell>
                               <TableCell>
-                                {event.walletId && deletedWalletIds.has(event.walletId) ? (
+                                {isWalletDeleted(event.walletId) ? (
                                   <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
                                     Deleted
                                   </Badge>
