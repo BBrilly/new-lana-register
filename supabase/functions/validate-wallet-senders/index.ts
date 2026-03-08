@@ -18,24 +18,22 @@ interface SenderValidationResult {
 }
 
 // Connect to Electrum and send/receive JSON-RPC
-async function electrumCall(server: ElectrumServer, requests: { id: number; method: string; params: any[] }[]): Promise<Map<number, any>> {
+async function electrumCall(server: ElectrumServer, requests: { id: number; method: string; params: any[] }[], timeoutMs = 30000): Promise<Map<number, any>> {
   const conn = await Deno.connect({ hostname: server.host, port: server.port });
   const responses = new Map<number, any>();
   
   try {
-    // Send all requests
     for (const request of requests) {
       const data = JSON.stringify(request) + '\n';
       await conn.write(new TextEncoder().encode(data));
     }
 
-    // Read responses
     const decoder = new TextDecoder();
     let buffer = '';
-    const timeout = setTimeout(() => conn.close(), 30000);
+    const timeout = setTimeout(() => { try { conn.close(); } catch(_){} }, timeoutMs);
 
     while (responses.size < requests.length) {
-      const chunk = new Uint8Array(8192);
+      const chunk = new Uint8Array(65536);
       const bytesRead = await conn.read(chunk);
       if (bytesRead === null) break;
 
@@ -49,7 +47,7 @@ async function electrumCall(server: ElectrumServer, requests: { id: number; meth
             const response = JSON.parse(line);
             responses.set(response.id, response);
           } catch (e) {
-            console.warn('Failed to parse response:', line.substring(0, 100));
+            // skip
           }
         }
       }
@@ -65,14 +63,227 @@ async function electrumCall(server: ElectrumServer, requests: { id: number; meth
   return responses;
 }
 
-// Extract sender addresses from a raw transaction hex
-function extractInputAddresses(txHex: string, targetAddress: string): string[] {
-  // We can't reliably parse raw tx hex for addresses without full script decoding
-  // Instead, we'll use blockchain.transaction.get with verbose=true
-  return [];
+// Decode a Bitcoin-like varint from a hex string at a given byte offset
+function readVarInt(hex: string, offset: number): { value: number; bytesRead: number } {
+  const firstByte = parseInt(hex.substring(offset * 2, offset * 2 + 2), 16);
+  if (firstByte < 0xfd) {
+    return { value: firstByte, bytesRead: 1 };
+  } else if (firstByte === 0xfd) {
+    const val = parseInt(hex.substring((offset + 1) * 2, (offset + 1) * 2 + 2) + hex.substring((offset + 2) * 2 - 2, (offset + 2) * 2), 16);
+    // Little endian
+    const b1 = parseInt(hex.substring((offset + 1) * 2, (offset + 1) * 2 + 2), 16);
+    const b2 = parseInt(hex.substring((offset + 2) * 2, (offset + 2) * 2 + 2), 16);
+    return { value: b1 + (b2 << 8), bytesRead: 3 };
+  } else if (firstByte === 0xfe) {
+    const b1 = parseInt(hex.substring((offset + 1) * 2, (offset + 1) * 2 + 2), 16);
+    const b2 = parseInt(hex.substring((offset + 2) * 2, (offset + 2) * 2 + 2), 16);
+    const b3 = parseInt(hex.substring((offset + 3) * 2, (offset + 3) * 2 + 2), 16);
+    const b4 = parseInt(hex.substring((offset + 4) * 2, (offset + 4) * 2 + 2), 16);
+    return { value: b1 + (b2 << 8) + (b3 << 16) + (b4 << 24), bytesRead: 5 };
+  }
+  return { value: 0, bytesRead: 9 }; // 0xff case, unlikely for our use
 }
 
-// Get all unique sender addresses for a wallet
+// Reverse byte order of a hex string (for txid)
+function reverseHex(hex: string): string {
+  const bytes = hex.match(/.{2}/g) || [];
+  return bytes.reverse().join('');
+}
+
+// Parse a raw transaction hex to extract input txids and vout indices
+function parseRawTxInputs(rawHex: string): { txid: string; vout: number }[] {
+  const inputs: { txid: string; vout: number }[] = [];
+  
+  try {
+    let offset = 0;
+    
+    // Version (4 bytes)
+    offset += 4;
+    
+    // nTime (4 bytes) - LANA/Peercoin specific field
+    offset += 4;
+    
+    // Check for segwit marker
+    const marker = parseInt(rawHex.substring(offset * 2, offset * 2 + 2), 16);
+    if (marker === 0x00) {
+      // Skip marker and flag
+      offset += 2;
+    }
+    
+    // Input count
+    const vinCount = readVarInt(rawHex, offset);
+    offset += vinCount.bytesRead;
+    
+    for (let i = 0; i < vinCount.value; i++) {
+      // Previous tx hash (32 bytes, reversed)
+      const prevTxHash = reverseHex(rawHex.substring(offset * 2, (offset + 32) * 2));
+      offset += 32;
+      
+      // Previous output index (4 bytes, little endian)
+      const voutHex = rawHex.substring(offset * 2, (offset + 4) * 2);
+      const b1 = parseInt(voutHex.substring(0, 2), 16);
+      const b2 = parseInt(voutHex.substring(2, 4), 16);
+      const b3 = parseInt(voutHex.substring(4, 6), 16);
+      const b4 = parseInt(voutHex.substring(6, 8), 16);
+      const voutIndex = b1 + (b2 << 8) + (b3 << 16) + (b4 << 24);
+      offset += 4;
+      
+      // Script length
+      const scriptLen = readVarInt(rawHex, offset);
+      offset += scriptLen.bytesRead;
+      
+      // Skip script
+      offset += scriptLen.value;
+      
+      // Sequence (4 bytes)
+      offset += 4;
+      
+      // Skip coinbase transactions (txid all zeros)
+      if (prevTxHash !== '0000000000000000000000000000000000000000000000000000000000000000') {
+        inputs.push({ txid: prevTxHash, vout: voutIndex });
+      }
+    }
+  } catch (e) {
+    // parsing error
+  }
+  
+  return inputs;
+}
+
+// Parse raw tx hex to extract output addresses from scriptPubKey
+// For P2PKH (most common for LANA): OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+function parseRawTxOutputs(rawHex: string): { scriptHex: string; index: number }[] {
+  const outputs: { scriptHex: string; index: number }[] = [];
+  
+  try {
+    let offset = 0;
+    
+    // Version (4 bytes)
+    offset += 4;
+    
+    // nTime (4 bytes) - LANA/Peercoin specific field
+    offset += 4;
+    
+    // Check for segwit marker
+    const marker = parseInt(rawHex.substring(offset * 2, offset * 2 + 2), 16);
+    if (marker === 0x00) {
+      offset += 2;
+    }
+    
+    // Skip inputs
+    const vinCount = readVarInt(rawHex, offset);
+    offset += vinCount.bytesRead;
+    
+    for (let i = 0; i < vinCount.value; i++) {
+      offset += 32; // prev tx hash
+      offset += 4;  // prev output index
+      const scriptLen = readVarInt(rawHex, offset);
+      offset += scriptLen.bytesRead;
+      offset += scriptLen.value; // script
+      offset += 4; // sequence
+    }
+    
+    // Output count
+    const voutCount = readVarInt(rawHex, offset);
+    offset += voutCount.bytesRead;
+    
+    for (let i = 0; i < voutCount.value; i++) {
+      offset += 8; // value (8 bytes)
+      
+      const scriptLen = readVarInt(rawHex, offset);
+      offset += scriptLen.bytesRead;
+      
+      const scriptHex = rawHex.substring(offset * 2, (offset + scriptLen.value) * 2);
+      offset += scriptLen.value;
+      
+      outputs.push({ scriptHex, index: i });
+    }
+  } catch (e) {
+    // parsing error
+  }
+  
+  return outputs;
+}
+
+// Convert a P2PKH scriptPubKey hash160 to a base58check address
+// LANA version byte is 0x30 (48)
+function hash160ToAddress(hash160Hex: string, versionByte: number = 0x30): string {
+  const payload = new Uint8Array(21);
+  payload[0] = versionByte;
+  for (let i = 0; i < 20; i++) {
+    payload[i + 1] = parseInt(hash160Hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  
+  return base58CheckEncode(payload);
+}
+
+async function sha256(data: Uint8Array): Promise<Uint8Array> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hashBuffer);
+}
+
+async function doubleSha256(data: Uint8Array): Promise<Uint8Array> {
+  const first = await sha256(data);
+  return await sha256(first);
+}
+
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function base58Encode(bytes: Uint8Array): string {
+  const digits = [0];
+  for (let i = 0; i < bytes.length; i++) {
+    let carry = bytes[i];
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] << 8;
+      digits[j] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  
+  let result = '';
+  // Leading zeros
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i++) {
+    result += BASE58_ALPHABET[0];
+  }
+  // Convert digits to base58
+  for (let i = digits.length - 1; i >= 0; i--) {
+    result += BASE58_ALPHABET[digits[i]];
+  }
+  return result;
+}
+
+async function base58CheckEncode(payload: Uint8Array): Promise<string> {
+  const checksum = await doubleSha256(payload);
+  const fullPayload = new Uint8Array(payload.length + 4);
+  fullPayload.set(payload);
+  fullPayload.set(checksum.slice(0, 4), payload.length);
+  return base58Encode(fullPayload);
+}
+
+// Extract address from a scriptPubKey hex
+// Handles P2PKH: 76a914{20 bytes}88ac
+// Handles P2SH: a914{20 bytes}87
+async function scriptPubKeyToAddress(scriptHex: string): Promise<string | null> {
+  // P2PKH: OP_DUP OP_HASH160 OP_PUSH20 <20bytes> OP_EQUALVERIFY OP_CHECKSIG
+  if (scriptHex.length === 50 && scriptHex.startsWith('76a914') && scriptHex.endsWith('88ac')) {
+    const hash160 = scriptHex.substring(6, 46);
+    return await hash160ToAddress(hash160, 0x30); // LANA P2PKH version byte
+  }
+  
+  // P2SH: OP_HASH160 OP_PUSH20 <20bytes> OP_EQUAL
+  if (scriptHex.length === 46 && scriptHex.startsWith('a914') && scriptHex.endsWith('87')) {
+    const hash160 = scriptHex.substring(4, 44);
+    return await hash160ToAddress(hash160, 0x05); // Standard P2SH version byte
+  }
+  
+  return null;
+}
+
+// Get all unique sender addresses for a wallet using raw tx parsing
 async function getWalletSenders(
   server: ElectrumServer,
   walletAddress: string,
@@ -98,16 +309,17 @@ async function getWalletSenders(
 
   if (txHashes.length === 0) return [];
 
-  // Step 2: Get verbose transaction details (in batches)
-  const BATCH_SIZE = 20;
+  // Step 2: Get raw transactions (non-verbose since LANA Electrum doesn't support verbose)
+  const BATCH_SIZE = 10;
   const allSenders = new Set<string>();
+  const prevTxNeeded = new Map<string, Set<number>>(); // txid -> set of vout indices
 
   for (let i = 0; i < txHashes.length; i += BATCH_SIZE) {
     const batch = txHashes.slice(i, i + BATCH_SIZE);
     const requests = batch.map((txHash, idx) => ({
       id: idx + 1,
       method: 'blockchain.transaction.get',
-      params: [txHash, true] // verbose=true to get decoded tx
+      params: [txHash] // No verbose flag
     }));
 
     const txResponses = await electrumCall(server, requests);
@@ -116,149 +328,83 @@ async function getWalletSenders(
       const txResponse = txResponses.get(j + 1);
       if (!txResponse?.result) continue;
 
-      const tx = txResponse.result;
+      const rawHex = txResponse.result;
+      
+      if (typeof rawHex !== 'string') {
+        // It's verbose JSON - try to use it
+        console.log(`[${correlationId}] Got verbose response for tx ${j}, type: ${typeof rawHex}`);
+        continue;
+      }
 
-      // Check if this transaction sends TO our wallet
+      // Parse outputs
+      const outputs = parseRawTxOutputs(rawHex);
+
+      // Check if this tx sends to our wallet
       let sendsToOurWallet = false;
-      if (tx.vout) {
-        for (const vout of tx.vout) {
-          const addresses = vout.scriptPubKey?.addresses || [];
-          if (addresses.includes(walletAddress)) {
-            sendsToOurWallet = true;
-            break;
-          }
+      for (const output of outputs) {
+        const addr = await scriptPubKeyToAddress(output.scriptHex);
+        if (addr === walletAddress) {
+          sendsToOurWallet = true;
+          break;
         }
       }
 
       if (!sendsToOurWallet) continue;
 
-      // Extract input addresses (senders)
-      if (tx.vin) {
-        for (const vin of tx.vin) {
-          // Coinbase transactions have no sender
-          if (vin.coinbase) continue;
-
-          // For inputs, we need to look at the previous transaction's output
-          // In verbose mode, some Electrum servers include the address in vin
-          if (vin.address) {
-            if (vin.address !== walletAddress) {
-              allSenders.add(vin.address);
-            }
-          } else if (vin.prevout?.scriptPubKey?.addresses) {
-            for (const addr of vin.prevout.scriptPubKey.addresses) {
-              if (addr !== walletAddress) {
-                allSenders.add(addr);
-              }
-            }
-          }
+      // Parse inputs to get prev tx references
+      const inputs = parseRawTxInputs(rawHex);
+      for (const input of inputs) {
+        if (!prevTxNeeded.has(input.txid)) {
+          prevTxNeeded.set(input.txid, new Set());
         }
+        prevTxNeeded.get(input.txid)!.add(input.vout);
       }
     }
 
-    // Small delay between batches
     if (i + BATCH_SIZE < txHashes.length) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
 
-  // If verbose mode didn't give us addresses in vin, we need to fetch prev transactions
-  // This is a fallback for Electrum servers that don't include prevout data
-  if (allSenders.size === 0 && txHashes.length > 0) {
-    console.log(`[${correlationId}] Verbose mode didn't return sender addresses, trying prev tx lookup`);
-    
-    for (let i = 0; i < txHashes.length; i += BATCH_SIZE) {
-      const batch = txHashes.slice(i, i + BATCH_SIZE);
-      
-      // First get the transactions (non-verbose to get raw structure)
-      const txRequests = batch.map((txHash, idx) => ({
-        id: idx + 1,
-        method: 'blockchain.transaction.get',
-        params: [txHash, true]
-      }));
-      
-      const txResponses = await electrumCall(server, txRequests);
-      
-      // Collect all prev tx hashes we need to look up
-      const prevTxLookups: { txHash: string; voutIndex: number; originalTxIdx: number }[] = [];
-      
-      for (let j = 0; j < batch.length; j++) {
-        const txResponse = txResponses.get(j + 1);
-        if (!txResponse?.result?.vin) continue;
-        
-        const tx = txResponse.result;
-        
-        // Check if sends to our wallet
-        let sendsToOurWallet = false;
-        if (tx.vout) {
-          for (const vout of tx.vout) {
-            const addresses = vout.scriptPubKey?.addresses || [];
-            if (addresses.includes(walletAddress)) {
-              sendsToOurWallet = true;
-              break;
-            }
-          }
-        }
-        
-        if (!sendsToOurWallet) continue;
-        
-        for (const vin of tx.vin) {
-          if (vin.coinbase) continue;
-          if (vin.txid) {
-            prevTxLookups.push({
-              txHash: vin.txid,
-              voutIndex: vin.vout,
-              originalTxIdx: j
-            });
+  console.log(`[${correlationId}] Need to look up ${prevTxNeeded.size} previous transactions`);
+
+  // Step 3: Fetch previous transactions to get sender addresses
+  const prevTxHashes = Array.from(prevTxNeeded.keys());
+
+  for (let k = 0; k < prevTxHashes.length; k += BATCH_SIZE) {
+    const prevBatch = prevTxHashes.slice(k, k + BATCH_SIZE);
+    const prevRequests = prevBatch.map((txHash, idx) => ({
+      id: idx + 1,
+      method: 'blockchain.transaction.get',
+      params: [txHash]
+    }));
+
+    const prevResponses = await electrumCall(server, prevRequests);
+
+    for (let m = 0; m < prevBatch.length; m++) {
+      const prevResponse = prevResponses.get(m + 1);
+      if (!prevResponse?.result || typeof prevResponse.result !== 'string') continue;
+
+      const prevRawHex = prevResponse.result;
+      const prevOutputs = parseRawTxOutputs(prevRawHex);
+      const neededVouts = prevTxNeeded.get(prevBatch[m])!;
+
+      for (const output of prevOutputs) {
+        if (neededVouts.has(output.index)) {
+          const addr = await scriptPubKeyToAddress(output.scriptHex);
+          if (addr && addr !== walletAddress) {
+            allSenders.add(addr);
           }
         }
       }
-      
-      // Fetch previous transactions to get sender addresses
-      if (prevTxLookups.length > 0) {
-        const uniquePrevTxHashes = [...new Set(prevTxLookups.map(l => l.txHash))];
-        
-        for (let k = 0; k < uniquePrevTxHashes.length; k += BATCH_SIZE) {
-          const prevBatch = uniquePrevTxHashes.slice(k, k + BATCH_SIZE);
-          const prevRequests = prevBatch.map((txHash, idx) => ({
-            id: idx + 1,
-            method: 'blockchain.transaction.get',
-            params: [txHash, true]
-          }));
-          
-          const prevResponses = await electrumCall(server, prevRequests);
-          
-          for (let m = 0; m < prevBatch.length; m++) {
-            const prevResponse = prevResponses.get(m + 1);
-            if (!prevResponse?.result?.vout) continue;
-            
-            const prevTx = prevResponse.result;
-            const relevantLookups = prevTxLookups.filter(l => l.txHash === prevBatch[m]);
-            
-            for (const lookup of relevantLookups) {
-              const output = prevTx.vout[lookup.voutIndex];
-              if (output?.scriptPubKey?.addresses) {
-                for (const addr of output.scriptPubKey.addresses) {
-                  if (addr !== walletAddress) {
-                    allSenders.add(addr);
-                  }
-                }
-              }
-            }
-          }
-          
-          if (k + BATCH_SIZE < uniquePrevTxHashes.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
-      }
-      
-      if (i + BATCH_SIZE < txHashes.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    }
+
+    if (k + BATCH_SIZE < prevTxHashes.length) {
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
 
-  console.log(`[${correlationId}] Found ${allSenders.size} unique senders`);
+  console.log(`[${correlationId}] Final: Found ${allSenders.size} unique senders`);
   return Array.from(allSenders);
 }
 
@@ -269,12 +415,7 @@ async function checkSendersRegistration(
   correlationId: string
 ): Promise<SenderValidationResult> {
   if (senders.length === 0) {
-    return {
-      totalSenders: 0,
-      registeredSenders: 0,
-      unregisteredSenders: [],
-      allRegistered: true
-    };
+    return { totalSenders: 0, registeredSenders: 0, unregisteredSenders: [], allRegistered: true };
   }
 
   const BATCH_SIZE = 50;
@@ -284,10 +425,9 @@ async function checkSendersRegistration(
 
   // Smart sampling for large sender lists
   if (senders.length > 100) {
-    console.log(`[${correlationId}] Large sender list (${senders.length}), doing smart sampling first`);
-    const sampleSize = 30;
+    console.log(`[${correlationId}] Large sender list (${senders.length}), sampling first`);
     const shuffled = [...senders].sort(() => Math.random() - 0.5);
-    const sample = shuffled.slice(0, sampleSize);
+    const sample = shuffled.slice(0, 30);
 
     const { data: sampleRegistered } = await supabase
       .from('wallets')
@@ -298,7 +438,6 @@ async function checkSendersRegistration(
     const sampleUnregistered = sample.filter(s => !sampleRegisteredSet.has(s));
 
     if (sampleUnregistered.length >= MAX_UNREGISTERED) {
-      console.log(`[${correlationId}] Sample found ${sampleUnregistered.length} unregistered, rejecting early`);
       return {
         totalSenders: senders.length,
         registeredSenders: 0,
@@ -308,7 +447,6 @@ async function checkSendersRegistration(
     }
   }
 
-  // Full validation in batches
   for (let i = 0; i < senders.length; i += BATCH_SIZE) {
     const batch = senders.slice(i, i + BATCH_SIZE);
 
@@ -327,9 +465,8 @@ async function checkSendersRegistration(
       }
     }
 
-    // Early exit if too many unregistered
     if (unregisteredSenders.length >= MAX_UNREGISTERED) {
-      console.log(`[${correlationId}] Found ${unregisteredSenders.length} unregistered senders, stopping early`);
+      console.log(`[${correlationId}] Found ${unregisteredSenders.length} unregistered, stopping early`);
       break;
     }
   }
@@ -373,7 +510,6 @@ Deno.serve(async (req) => {
 
     console.log(`[${correlationId}] Validating senders for wallet: ${wallet_address}`);
 
-    // Try each electrum server
     let senders: string[] = [];
     let serverUsed = '';
 
@@ -399,7 +535,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check sender registration
     const result = await checkSendersRegistration(supabase, senders, correlationId);
 
     console.log(`[${correlationId}] Validation complete: ${result.registeredSenders}/${result.totalSenders} registered, ${result.unregisteredSenders.length} unregistered`);
