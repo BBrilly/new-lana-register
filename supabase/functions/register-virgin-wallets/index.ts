@@ -889,8 +889,8 @@ async function handleRegisterWithRegisteredLanas(
 
       await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      pool.close(sysParams.relays);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try { pool.close(sysParams.relays); } catch (_) {}
     } catch (error) {
       console.error(`[${correlationId}] Error in Nostr broadcasting:`, error);
       walletResult.nostr_broadcast = "failed";

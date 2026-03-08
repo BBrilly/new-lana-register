@@ -456,18 +456,22 @@ const AddWallet = () => {
     </div>
   );
 
-  const renderTypeAndDescription = () => (
+  const renderTypeAndDescription = (lockToWallet = false) => (
     <>
       <div className="space-y-2">
         <Label htmlFor="type">Wallet Type</Label>
-        <Select value={type} onValueChange={(value: any) => setType(value)}>
-          <SelectTrigger id="type"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {walletTypes.map((walletType) => (
-              <SelectItem key={walletType.id} value={walletType.name}>{walletType.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {lockToWallet ? (
+          <Input id="type" value="Wallet" disabled className="bg-muted" />
+        ) : (
+          <Select value={type} onValueChange={(value: any) => setType(value)}>
+            <SelectTrigger id="type"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {walletTypes.map((walletType) => (
+                <SelectItem key={walletType.id} value={walletType.name}>{walletType.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
