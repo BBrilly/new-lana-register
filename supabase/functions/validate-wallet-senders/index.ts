@@ -33,7 +33,7 @@ async function electrumCall(server: ElectrumServer, requests: { id: number; meth
     const timeout = setTimeout(() => { try { conn.close(); } catch(_){} }, timeoutMs);
 
     while (responses.size < requests.length) {
-      const chunk = new Uint8Array(16384);
+      const chunk = new Uint8Array(65536);
       const bytesRead = await conn.read(chunk);
       if (bytesRead === null) break;
 
@@ -63,30 +63,221 @@ async function electrumCall(server: ElectrumServer, requests: { id: number; meth
   return responses;
 }
 
-// Extract addresses from a scriptPubKey object (handles both 'address' and 'addresses' fields)
-function getAddressesFromScriptPubKey(scriptPubKey: any): string[] {
-  if (!scriptPubKey) return [];
-  const addrs: string[] = [];
-  if (scriptPubKey.addresses && Array.isArray(scriptPubKey.addresses)) {
-    addrs.push(...scriptPubKey.addresses);
+// Decode a Bitcoin-like varint from a hex string at a given byte offset
+function readVarInt(hex: string, offset: number): { value: number; bytesRead: number } {
+  const firstByte = parseInt(hex.substring(offset * 2, offset * 2 + 2), 16);
+  if (firstByte < 0xfd) {
+    return { value: firstByte, bytesRead: 1 };
+  } else if (firstByte === 0xfd) {
+    const val = parseInt(hex.substring((offset + 1) * 2, (offset + 1) * 2 + 2) + hex.substring((offset + 2) * 2 - 2, (offset + 2) * 2), 16);
+    // Little endian
+    const b1 = parseInt(hex.substring((offset + 1) * 2, (offset + 1) * 2 + 2), 16);
+    const b2 = parseInt(hex.substring((offset + 2) * 2, (offset + 2) * 2 + 2), 16);
+    return { value: b1 + (b2 << 8), bytesRead: 3 };
+  } else if (firstByte === 0xfe) {
+    const b1 = parseInt(hex.substring((offset + 1) * 2, (offset + 1) * 2 + 2), 16);
+    const b2 = parseInt(hex.substring((offset + 2) * 2, (offset + 2) * 2 + 2), 16);
+    const b3 = parseInt(hex.substring((offset + 3) * 2, (offset + 3) * 2 + 2), 16);
+    const b4 = parseInt(hex.substring((offset + 4) * 2, (offset + 4) * 2 + 2), 16);
+    return { value: b1 + (b2 << 8) + (b3 << 16) + (b4 << 24), bytesRead: 5 };
   }
-  if (scriptPubKey.address && typeof scriptPubKey.address === 'string') {
-    if (!addrs.includes(scriptPubKey.address)) addrs.push(scriptPubKey.address);
-  }
-  return addrs;
+  return { value: 0, bytesRead: 9 }; // 0xff case, unlikely for our use
 }
 
-// Check if a transaction sends to our wallet address
-function txSendsToWallet(tx: any, walletAddress: string): boolean {
-  if (!tx.vout) return false;
-  for (const vout of tx.vout) {
-    const addresses = getAddressesFromScriptPubKey(vout.scriptPubKey);
-    if (addresses.includes(walletAddress)) return true;
-  }
-  return false;
+// Reverse byte order of a hex string (for txid)
+function reverseHex(hex: string): string {
+  const bytes = hex.match(/.{2}/g) || [];
+  return bytes.reverse().join('');
 }
 
-// Get all unique sender addresses for a wallet
+// Parse a raw transaction hex to extract input txids and vout indices
+function parseRawTxInputs(rawHex: string): { txid: string; vout: number }[] {
+  const inputs: { txid: string; vout: number }[] = [];
+  
+  try {
+    let offset = 0;
+    
+    // Version (4 bytes)
+    offset += 4;
+    
+    // Check for segwit marker
+    const marker = parseInt(rawHex.substring(offset * 2, offset * 2 + 2), 16);
+    if (marker === 0x00) {
+      // Skip marker and flag
+      offset += 2;
+    }
+    
+    // Input count
+    const vinCount = readVarInt(rawHex, offset);
+    offset += vinCount.bytesRead;
+    
+    for (let i = 0; i < vinCount.value; i++) {
+      // Previous tx hash (32 bytes, reversed)
+      const prevTxHash = reverseHex(rawHex.substring(offset * 2, (offset + 32) * 2));
+      offset += 32;
+      
+      // Previous output index (4 bytes, little endian)
+      const voutHex = rawHex.substring(offset * 2, (offset + 4) * 2);
+      const b1 = parseInt(voutHex.substring(0, 2), 16);
+      const b2 = parseInt(voutHex.substring(2, 4), 16);
+      const b3 = parseInt(voutHex.substring(4, 6), 16);
+      const b4 = parseInt(voutHex.substring(6, 8), 16);
+      const voutIndex = b1 + (b2 << 8) + (b3 << 16) + (b4 << 24);
+      offset += 4;
+      
+      // Script length
+      const scriptLen = readVarInt(rawHex, offset);
+      offset += scriptLen.bytesRead;
+      
+      // Skip script
+      offset += scriptLen.value;
+      
+      // Sequence (4 bytes)
+      offset += 4;
+      
+      // Skip coinbase transactions (txid all zeros)
+      if (prevTxHash !== '0000000000000000000000000000000000000000000000000000000000000000') {
+        inputs.push({ txid: prevTxHash, vout: voutIndex });
+      }
+    }
+  } catch (e) {
+    // parsing error
+  }
+  
+  return inputs;
+}
+
+// Parse raw tx hex to extract output addresses from scriptPubKey
+// For P2PKH (most common for LANA): OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+function parseRawTxOutputs(rawHex: string): { scriptHex: string; index: number }[] {
+  const outputs: { scriptHex: string; index: number }[] = [];
+  
+  try {
+    let offset = 0;
+    
+    // Version (4 bytes)
+    offset += 4;
+    
+    // Check for segwit marker
+    const marker = parseInt(rawHex.substring(offset * 2, offset * 2 + 2), 16);
+    if (marker === 0x00) {
+      offset += 2;
+    }
+    
+    // Skip inputs
+    const vinCount = readVarInt(rawHex, offset);
+    offset += vinCount.bytesRead;
+    
+    for (let i = 0; i < vinCount.value; i++) {
+      offset += 32; // prev tx hash
+      offset += 4;  // prev output index
+      const scriptLen = readVarInt(rawHex, offset);
+      offset += scriptLen.bytesRead;
+      offset += scriptLen.value; // script
+      offset += 4; // sequence
+    }
+    
+    // Output count
+    const voutCount = readVarInt(rawHex, offset);
+    offset += voutCount.bytesRead;
+    
+    for (let i = 0; i < voutCount.value; i++) {
+      offset += 8; // value (8 bytes)
+      
+      const scriptLen = readVarInt(rawHex, offset);
+      offset += scriptLen.bytesRead;
+      
+      const scriptHex = rawHex.substring(offset * 2, (offset + scriptLen.value) * 2);
+      offset += scriptLen.value;
+      
+      outputs.push({ scriptHex, index: i });
+    }
+  } catch (e) {
+    // parsing error
+  }
+  
+  return outputs;
+}
+
+// Convert a P2PKH scriptPubKey hash160 to a base58check address
+// LANA version byte is 0x30 (48)
+function hash160ToAddress(hash160Hex: string, versionByte: number = 0x30): string {
+  const payload = new Uint8Array(21);
+  payload[0] = versionByte;
+  for (let i = 0; i < 20; i++) {
+    payload[i + 1] = parseInt(hash160Hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  
+  return base58CheckEncode(payload);
+}
+
+async function sha256(data: Uint8Array): Promise<Uint8Array> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hashBuffer);
+}
+
+async function doubleSha256(data: Uint8Array): Promise<Uint8Array> {
+  const first = await sha256(data);
+  return await sha256(first);
+}
+
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function base58Encode(bytes: Uint8Array): string {
+  const digits = [0];
+  for (let i = 0; i < bytes.length; i++) {
+    let carry = bytes[i];
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] << 8;
+      digits[j] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  
+  let result = '';
+  // Leading zeros
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i++) {
+    result += BASE58_ALPHABET[0];
+  }
+  // Convert digits to base58
+  for (let i = digits.length - 1; i >= 0; i--) {
+    result += BASE58_ALPHABET[digits[i]];
+  }
+  return result;
+}
+
+async function base58CheckEncode(payload: Uint8Array): Promise<string> {
+  const checksum = await doubleSha256(payload);
+  const fullPayload = new Uint8Array(payload.length + 4);
+  fullPayload.set(payload);
+  fullPayload.set(checksum.slice(0, 4), payload.length);
+  return base58Encode(fullPayload);
+}
+
+// Extract address from a scriptPubKey hex
+// Handles P2PKH: 76a914{20 bytes}88ac
+// Handles P2SH: a914{20 bytes}87
+async function scriptPubKeyToAddress(scriptHex: string): Promise<string | null> {
+  // P2PKH: OP_DUP OP_HASH160 OP_PUSH20 <20bytes> OP_EQUALVERIFY OP_CHECKSIG
+  if (scriptHex.length === 50 && scriptHex.startsWith('76a914') && scriptHex.endsWith('88ac')) {
+    const hash160 = scriptHex.substring(6, 46);
+    return await hash160ToAddress(hash160, 0x30); // LANA P2PKH version byte
+  }
+  
+  // P2SH: OP_HASH160 OP_PUSH20 <20bytes> OP_EQUAL
+  if (scriptHex.length === 46 && scriptHex.startsWith('a914') && scriptHex.endsWith('87')) {
+    const hash160 = scriptHex.substring(4, 44);
+    return await hash160ToAddress(hash160, 0x05); // Standard P2SH version byte
+  }
+  
+  return null;
+}
+
+// Get all unique sender addresses for a wallet using raw tx parsing
 async function getWalletSenders(
   server: ElectrumServer,
   walletAddress: string,
@@ -112,19 +303,17 @@ async function getWalletSenders(
 
   if (txHashes.length === 0) return [];
 
-  // Step 2: Get verbose transaction details
+  // Step 2: Get raw transactions (non-verbose since LANA Electrum doesn't support verbose)
   const BATCH_SIZE = 10;
   const allSenders = new Set<string>();
-  
-  // Collect all prev tx lookups needed
-  const prevTxNeeded: { txHash: string; voutIndex: number }[] = [];
+  const prevTxNeeded = new Map<string, Set<number>>(); // txid -> set of vout indices
 
   for (let i = 0; i < txHashes.length; i += BATCH_SIZE) {
     const batch = txHashes.slice(i, i + BATCH_SIZE);
     const requests = batch.map((txHash, idx) => ({
       id: idx + 1,
       method: 'blockchain.transaction.get',
-      params: [txHash, true]
+      params: [txHash] // No verbose flag
     }));
 
     const txResponses = await electrumCall(server, requests);
@@ -133,102 +322,83 @@ async function getWalletSenders(
       const txResponse = txResponses.get(j + 1);
       if (!txResponse?.result) continue;
 
-      const tx = txResponse.result;
+      const rawHex = txResponse.result;
+      
+      if (typeof rawHex !== 'string') {
+        // It's verbose JSON - try to use it
+        console.log(`[${correlationId}] Got verbose response for tx ${j}, type: ${typeof rawHex}`);
+        continue;
+      }
 
-      // Log first tx structure for debugging
+      // Debug: log first tx
       if (i === 0 && j === 0) {
-        const sampleVin = tx.vin?.[0];
-        const sampleVout = tx.vout?.[0];
-        console.log(`[${correlationId}] Sample vin keys: ${sampleVin ? Object.keys(sampleVin).join(', ') : 'none'}`);
-        console.log(`[${correlationId}] Sample vout scriptPubKey keys: ${sampleVout?.scriptPubKey ? Object.keys(sampleVout.scriptPubKey).join(', ') : 'none'}`);
-        if (sampleVin) {
-          console.log(`[${correlationId}] Sample vin has address: ${!!sampleVin.address}, prevout: ${!!sampleVin.prevout}, txid: ${!!sampleVin.txid}, vout: ${sampleVin.vout !== undefined}`);
+        console.log(`[${correlationId}] First raw tx hex length: ${rawHex.length}`);
+      }
+
+      // Parse outputs to check if this tx sends to our wallet
+      const outputs = parseRawTxOutputs(rawHex);
+      let sendsToOurWallet = false;
+      
+      for (const output of outputs) {
+        const addr = await scriptPubKeyToAddress(output.scriptHex);
+        if (addr === walletAddress) {
+          sendsToOurWallet = true;
+          break;
         }
       }
 
-      // Check if this transaction sends TO our wallet
-      if (!txSendsToWallet(tx, walletAddress)) continue;
+      if (!sendsToOurWallet) continue;
 
-      // Extract input addresses (senders)
-      if (tx.vin) {
-        for (const vin of tx.vin) {
-          if (vin.coinbase) continue;
-
-          // Try direct address field
-          if (vin.address && vin.address !== walletAddress) {
-            allSenders.add(vin.address);
-            continue;
-          }
-
-          // Try prevout field
-          if (vin.prevout?.scriptPubKey) {
-            const addrs = getAddressesFromScriptPubKey(vin.prevout.scriptPubKey);
-            for (const addr of addrs) {
-              if (addr !== walletAddress) allSenders.add(addr);
-            }
-            continue;
-          }
-
-          // Need to look up previous transaction
-          if (vin.txid !== undefined && vin.vout !== undefined) {
-            prevTxNeeded.push({ txHash: vin.txid, voutIndex: vin.vout });
-          }
+      // Parse inputs to get prev tx references
+      const inputs = parseRawTxInputs(rawHex);
+      for (const input of inputs) {
+        if (!prevTxNeeded.has(input.txid)) {
+          prevTxNeeded.set(input.txid, new Set());
         }
+        prevTxNeeded.get(input.txid)!.add(input.vout);
       }
     }
 
     if (i + BATCH_SIZE < txHashes.length) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
 
-  console.log(`[${correlationId}] Direct extraction found ${allSenders.size} senders, need ${prevTxNeeded.length} prev tx lookups`);
+  console.log(`[${correlationId}] Need to look up ${prevTxNeeded.size} previous transactions`);
 
-  // Step 3: Fetch previous transactions to resolve sender addresses
-  if (prevTxNeeded.length > 0) {
-    // Deduplicate by txHash
-    const uniquePrevTxMap = new Map<string, number[]>();
-    for (const { txHash, voutIndex } of prevTxNeeded) {
-      if (!uniquePrevTxMap.has(txHash)) uniquePrevTxMap.set(txHash, []);
-      uniquePrevTxMap.get(txHash)!.push(voutIndex);
-    }
+  // Step 3: Fetch previous transactions to get sender addresses
+  const prevTxHashes = Array.from(prevTxNeeded.keys());
 
-    const uniquePrevTxHashes = Array.from(uniquePrevTxMap.keys());
-    console.log(`[${correlationId}] Looking up ${uniquePrevTxHashes.length} unique prev transactions`);
+  for (let k = 0; k < prevTxHashes.length; k += BATCH_SIZE) {
+    const prevBatch = prevTxHashes.slice(k, k + BATCH_SIZE);
+    const prevRequests = prevBatch.map((txHash, idx) => ({
+      id: idx + 1,
+      method: 'blockchain.transaction.get',
+      params: [txHash]
+    }));
 
-    for (let k = 0; k < uniquePrevTxHashes.length; k += BATCH_SIZE) {
-      const prevBatch = uniquePrevTxHashes.slice(k, k + BATCH_SIZE);
-      const prevRequests = prevBatch.map((txHash, idx) => ({
-        id: idx + 1,
-        method: 'blockchain.transaction.get',
-        params: [txHash, true]
-      }));
+    const prevResponses = await electrumCall(server, prevRequests);
 
-      const prevResponses = await electrumCall(server, prevRequests);
+    for (let m = 0; m < prevBatch.length; m++) {
+      const prevResponse = prevResponses.get(m + 1);
+      if (!prevResponse?.result || typeof prevResponse.result !== 'string') continue;
 
-      for (let m = 0; m < prevBatch.length; m++) {
-        const prevResponse = prevResponses.get(m + 1);
-        if (!prevResponse?.result?.vout) continue;
+      const prevRawHex = prevResponse.result;
+      const prevOutputs = parseRawTxOutputs(prevRawHex);
+      const neededVouts = prevTxNeeded.get(prevBatch[m])!;
 
-        const prevTx = prevResponse.result;
-        const voutIndices = uniquePrevTxMap.get(prevBatch[m]) || [];
-
-        for (const voutIndex of voutIndices) {
-          const output = prevTx.vout[voutIndex];
-          if (output?.scriptPubKey) {
-            const addrs = getAddressesFromScriptPubKey(output.scriptPubKey);
-            for (const addr of addrs) {
-              if (addr !== walletAddress) {
-                allSenders.add(addr);
-              }
-            }
+      for (const output of prevOutputs) {
+        if (neededVouts.has(output.index)) {
+          const addr = await scriptPubKeyToAddress(output.scriptHex);
+          if (addr && addr !== walletAddress) {
+            allSenders.add(addr);
           }
         }
       }
+    }
 
-      if (k + BATCH_SIZE < uniquePrevTxHashes.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    if (k + BATCH_SIZE < prevTxHashes.length) {
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
 
@@ -275,7 +445,6 @@ async function checkSendersRegistration(
     }
   }
 
-  // Full validation in batches
   for (let i = 0; i < senders.length; i += BATCH_SIZE) {
     const batch = senders.slice(i, i + BATCH_SIZE);
 
