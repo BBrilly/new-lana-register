@@ -1235,7 +1235,11 @@ const LandingPage = () => {
                                 {formatDistanceToNow(new Date(event.createdAt * 1000), { addSuffix: true })}
                               </TableCell>
                               <TableCell>
-                                {event.isReturned ? (
+                                {event.walletId && deletedWalletIds.has(event.walletId) ? (
+                                  <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
+                                    Deleted
+                                  </Badge>
+                                ) : event.isReturned ? (
                                   <Badge variant="default" className="bg-green-500/20 text-green-600 border-green-500/30">
                                     <Check className="h-3 w-3 mr-1" />
                                     Returned
