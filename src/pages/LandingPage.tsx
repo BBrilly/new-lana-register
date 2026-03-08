@@ -1174,7 +1174,7 @@ const LandingPage = () => {
                         paginatedNostrEvents.map((event, index) => (
                           <React.Fragment key={event.id}>
                             <TableRow 
-                              className="cursor-pointer hover:bg-muted/50"
+                              className={cn("cursor-pointer hover:bg-muted/50", event.walletId && deletedWalletIds.has(event.walletId) && "bg-muted/40 opacity-70")}
                               onClick={() => handleExpandEvent(event.id, event.id)}
                             >
                               <TableCell className="font-medium">
