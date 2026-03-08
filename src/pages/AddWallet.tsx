@@ -80,9 +80,8 @@ const AddWallet = () => {
     if (activeTab === "virgin") {
       setType(walletTypes.length > 0 ? walletTypes[0].name : "");
     } else {
-      // Default to "Wallet" for registered lanas
-      const walletType = walletTypes.find(t => t.name === "Wallet");
-      setType(walletType ? walletType.name : (walletTypes.length > 0 ? walletTypes[0].name : ""));
+      // Always force "Wallet" for registered lanas
+      setType("Wallet");
     }
   }, [activeTab, walletTypes]);
 
