@@ -100,6 +100,9 @@ function parseRawTxInputs(rawHex: string): { txid: string; vout: number }[] {
     // Version (4 bytes)
     offset += 4;
     
+    // nTime (4 bytes) - LANA/Peercoin specific field
+    offset += 4;
+    
     // Check for segwit marker
     const marker = parseInt(rawHex.substring(offset * 2, offset * 2 + 2), 16);
     if (marker === 0x00) {
