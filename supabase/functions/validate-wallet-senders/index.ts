@@ -330,20 +330,22 @@ async function getWalletSenders(
         continue;
       }
 
+      // Parse outputs
+      const outputs = parseRawTxOutputs(rawHex);
+
       // Debug: log first tx outputs
       if (i === 0 && j === 0) {
         console.log(`[${correlationId}] First raw tx hex length: ${rawHex.length}`);
         console.log(`[${correlationId}] First tx outputs count: ${outputs.length}`);
         for (const output of outputs) {
           const addr = await scriptPubKeyToAddress(output.scriptHex);
-          console.log(`[${correlationId}] Output ${output.index}: script=${output.scriptHex.substring(0, 20)}..., addr=${addr}`);
+          console.log(`[${correlationId}] Output ${output.index}: script=${output.scriptHex}, addr=${addr}`);
         }
         console.log(`[${correlationId}] Looking for wallet: ${walletAddress}`);
       }
 
-      // Parse outputs to check if this tx sends to our wallet
+      // Check if this tx sends to our wallet
       let sendsToOurWallet = false;
-      
       for (const output of outputs) {
         const addr = await scriptPubKeyToAddress(output.scriptHex);
         if (addr === walletAddress) {
