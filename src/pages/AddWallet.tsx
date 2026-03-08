@@ -80,9 +80,8 @@ const AddWallet = () => {
     if (activeTab === "virgin") {
       setType(walletTypes.length > 0 ? walletTypes[0].name : "");
     } else {
-      // Default to "Wallet" for registered lanas
-      const walletType = walletTypes.find(t => t.name === "Wallet");
-      setType(walletType ? walletType.name : (walletTypes.length > 0 ? walletTypes[0].name : ""));
+      // Always force "Wallet" for registered lanas
+      setType("Wallet");
     }
   }, [activeTab, walletTypes]);
 
@@ -358,7 +357,7 @@ const AddWallet = () => {
             data: {
               nostr_id_hex: session.nostrHexId,
               wallet_id: walletNumber,
-              wallet_type: type,
+              wallet_type: "Wallet",
               notes: description
             }
           }
@@ -456,18 +455,22 @@ const AddWallet = () => {
     </div>
   );
 
-  const renderTypeAndDescription = () => (
+  const renderTypeAndDescription = (lockToWallet = false) => (
     <>
       <div className="space-y-2">
         <Label htmlFor="type">Wallet Type</Label>
-        <Select value={type} onValueChange={(value: any) => setType(value)}>
-          <SelectTrigger id="type"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {walletTypes.map((walletType) => (
-              <SelectItem key={walletType.id} value={walletType.name}>{walletType.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {lockToWallet ? (
+          <Input id="type" value="Wallet" disabled className="bg-muted" />
+        ) : (
+          <Select value={type} onValueChange={(value: any) => setType(value)}>
+            <SelectTrigger id="type"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {walletTypes.map((walletType) => (
+                <SelectItem key={walletType.id} value={walletType.name}>{walletType.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
@@ -637,7 +640,7 @@ const AddWallet = () => {
                 </div>
               )}
 
-              {renderTypeAndDescription()}
+              {renderTypeAndDescription(true)}
 
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => navigate("/wallets")} disabled={isScanning}>Cancel</Button>
