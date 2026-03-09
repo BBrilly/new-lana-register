@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Snowflake, Sun, Loader2, User, AlertTriangle } from "lucide-react";
+import { Search, Snowflake, Sun, Loader2, User, AlertTriangle, Settings, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -39,6 +39,51 @@ const FreezeManager = () => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [freezeDialogOpen, setFreezeDialogOpen] = useState(false);
   const [freezeReason, setFreezeReason] = useState("frozen_l8w");
+
+  // Auto-freeze threshold state
+  const [thresholdValue, setThresholdValue] = useState("");
+  const [thresholdLoading, setThresholdLoading] = useState(true);
+  const [thresholdSaving, setThresholdSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchThreshold = async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "auto_freeze_threshold_lana")
+        .maybeSingle();
+      if (data) setThresholdValue(data.value);
+      setThresholdLoading(false);
+    };
+    fetchThreshold();
+  }, []);
+
+  const handleSaveThreshold = async () => {
+    const num = parseFloat(thresholdValue);
+    if (isNaN(num) || num <= 0) {
+      toast.error("Enter a valid positive number");
+      return;
+    }
+    setThresholdSaving(true);
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert(
+          {
+            key: "auto_freeze_threshold_lana",
+            value: num.toString(),
+            description: "Auto-freeze threshold: wallets receiving more than this amount of unregistered LANA get frozen",
+          },
+          { onConflict: "key" }
+        );
+      if (error) throw error;
+      toast.success("Auto-freeze threshold saved");
+    } catch (err: any) {
+      toast.error(err.message || "Error saving threshold");
+    } finally {
+      setThresholdSaving(false);
+    }
+  };
 
   const FREEZE_CODES = [
     { value: "frozen_l8w", label: "Late Wallet Registration", description: "Frozen due to late wallet registration" },
@@ -219,6 +264,46 @@ const FreezeManager = () => {
 
   return (
     <div className="space-y-4">
+      {/* Auto-Freeze Threshold */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-primary" />
+            Auto-Freeze Threshold
+          </CardTitle>
+          <CardDescription>
+            Wallets receiving more than this amount of unregistered LANA will be automatically frozen with status <code className="text-xs bg-muted px-1 py-0.5 rounded">frozen_unreg_Lanas</code>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {thresholdLoading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <div className="flex gap-2 items-center">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 100"
+                value={thresholdValue}
+                onChange={(e) => setThresholdValue(e.target.value)}
+                className="max-w-xs"
+              />
+              <span className="text-sm text-muted-foreground">LANA</span>
+              <Button
+                onClick={handleSaveThreshold}
+                disabled={thresholdSaving}
+                size="sm"
+                className="gap-2 ml-2"
+              >
+                {thresholdSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Search */}
       <Card>
         <CardHeader>
