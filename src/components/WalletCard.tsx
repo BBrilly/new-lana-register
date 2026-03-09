@@ -45,7 +45,9 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
     setIsEditingNotes(false);
   };
 
-  const canDelete = !["main", "lana8wonder", "knights", "lanaknights"].some(
+  const isFrozen = wallet.frozen === true;
+
+  const canDelete = !isFrozen && !["main", "lana8wonder", "knights", "lanaknights"].some(
     t => wallet.type.toLowerCase().includes(t)
   );
 
