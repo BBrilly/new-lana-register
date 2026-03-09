@@ -1,12 +1,24 @@
 
 
-# Completed: Add KIND 30889 broadcast to auto-freeze in blockchain-monitor
+## Plan: Mark frozen wallets visually and prevent deletion
 
-## What was done
-Updated `blockchain-monitor` to call the existing `freeze-wallets` edge function (via HTTP) instead of directly updating the `wallets` table. This ensures that when a wallet is auto-frozen due to receiving unregistered LANA above the threshold, a KIND 30889 event is also broadcast to Nostr relays.
+### Problem
+Frozen wallets on the Wallets page look identical to normal wallets. Users need a clear visual indicator (snowflake icon + light blue background) and frozen wallets should not be deletable.
 
-### Implementation
-- Wallets to freeze are collected in a `walletsToAutoFreeze` map during transaction processing
-- After all transactions in a block are processed, wallets are grouped by owner (`nostr_hex_id`)
-- For each owner group, `freeze-wallets` is called with `freeze_reason: 'frozen_unreg_Lanas'`
-- `freeze-wallets` handles both the DB update AND the KIND 30889 broadcast
+### Changes
+
+#### 1. Update `src/types/wallet.ts`
+- Add `frozen?: boolean` and `freezeReason?: string` to the `Wallet` interface.
+
+#### 2. Update `src/hooks/useUserWallets.ts`
+- Pass `frozen` and `freeze_reason` from the database query result into the mapped `Wallet` objects.
+
+#### 3. Update `src/components/WalletCard.tsx`
+- Import `Snowflake` icon from lucide-react.
+- If `wallet.frozen` is true:
+  - Apply light blue border and background to the Card (`border-blue-400/50 bg-blue-50/30 dark:bg-blue-950/20`).
+  - Show a `Snowflake` icon + "Frozen" badge in the header area.
+  - Display the freeze reason if available.
+- Update `canDelete` logic: also return `false` when `wallet.frozen === true`.
+- Hide the delete button entirely for frozen wallets.
+
