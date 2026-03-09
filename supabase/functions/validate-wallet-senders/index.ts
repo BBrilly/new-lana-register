@@ -424,6 +424,7 @@ async function checkSendersRegistration(
   const MAX_UNREGISTERED = 5;
   const registeredSet = new Set<string>();
   const unregisteredSenders: string[] = [];
+  const frozenSenders: string[] = [];
 
   // Smart sampling for large sender lists
   if (senders.length > 100) {
