@@ -337,6 +337,20 @@ Deno.serve(async (req) => {
                         totalKnightsTransactions++;
                         console.log(`🏰 Knights wallet received ${receiver.amount} UNREGISTERED LANA from unregistered sender`);
                       }
+
+                      // Auto-freeze: if unregistered LANA amount exceeds threshold
+                      if (autoFreezeThreshold !== null && receiver.amount >= autoFreezeThreshold) {
+                        const { error: freezeError } = await supabase
+                          .from('wallets')
+                          .update({ frozen: true, freeze_reason: 'frozen_unreg_Lanas' })
+                          .eq('id', receiverWallet!.id);
+
+                        if (freezeError) {
+                          console.error(`❌ Failed to auto-freeze wallet ${receiver.address}:`, freezeError);
+                        } else {
+                          console.log(`🧊 Auto-frozen wallet ${receiver.address} — received ${receiver.amount} LANA from unregistered sender (threshold: ${autoFreezeThreshold})`);
+                        }
+                      }
                     }
                   }
                 }
