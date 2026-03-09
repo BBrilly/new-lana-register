@@ -1,20 +1,26 @@
 
 
-# Fix: Filter out registered wallets from Outgoing TX tab
+## Plan: Add KIND 30889 broadcast to auto-freeze in blockchain-monitor
 
-## Problem
-The Outgoing TX tab shows transactions where `to_wallet_id IS NULL`, assuming the recipient is unregistered. But some destinations ARE registered — the `to_wallet_id` just wasn't linked at transaction recording time. Example: `LZAHDoeKaJ1uTwXZ3bL8dfbJXT7Af9a8sW` is in `wallets` table but appears in Outgoing TX because its transaction record has `to_wallet_id = NULL`.
+### Problem
+When `blockchain-monitor` auto-freezes a wallet (lines 335-346), it only updates the database (`wallets.frozen = true`). It does NOT broadcast an updated KIND 30889 event to Nostr relays. The `freeze-wallets` edge function does both — but `blockchain-monitor` skips the Nostr broadcast entirely.
 
-## Fix in `src/pages/LandingPage.tsx`
+### Solution
+After a successful auto-freeze in `blockchain-monitor`, call the existing `freeze-wallets` edge function internally (via `supabase.functions.invoke`) to handle both the DB update and the KIND 30889 broadcast. This avoids duplicating the Nostr broadcast logic.
 
-After fetching transactions and parsing `toAddress` from notes, cross-reference all parsed destination addresses against the `wallets` table. Filter out any transaction where the destination address is actually registered.
+### Changes
 
-### Steps:
-1. Collect all parsed `toAddress` values from the transactions
-2. Query `wallets` table to check which of these addresses are registered: `SELECT wallet_id FROM wallets WHERE wallet_id IN (...parsedAddresses)`
-3. Build a `registeredAddressSet` from the results
-4. Filter out transactions where `registeredAddressSet.has(toAddress)` before setting state
-5. Keep the existing `deletedAddressSet` logic — deleted wallets should still show (with badge) since they are no longer active
+#### 1. Update `supabase/functions/blockchain-monitor/index.ts`
+- Remove the direct `wallets.update({ frozen: true })` call at lines 336-339
+- Replace it with a call to `freeze-wallets` edge function via HTTP fetch (since we're in an edge function context, use the Supabase URL + service role key)
+- The call needs: `wallet_ids` (array of wallet UUIDs), `freeze: true`, `freeze_reason: 'frozen_unreg_Lanas'`, and `nostr_hex_id` (the owner's hex pubkey)
+- To get `nostr_hex_id`, look up the wallet's `main_wallet_id` → `main_wallets.nostr_hex_id`
+- Collect all wallets to freeze during block processing, then batch-call `freeze-wallets` after processing each block (to avoid calling it per-transaction)
 
-This ensures only truly unregistered destinations appear in the Outgoing TX tab.
+#### 2. Implementation detail
+- After the receiver wallet is identified for auto-freeze, store it in a `walletsToAutoFreeze` map: `{ walletId, walletUuid, receiverAmount }`
+- After all transactions in a block are processed, for each wallet to freeze:
+  1. Query `main_wallets.nostr_hex_id` via the wallet's `main_wallet_id`
+  2. Call `freeze-wallets` with the wallet UUID, `freeze: true`, `freeze_reason: 'frozen_unreg_Lanas'`, and the `nostr_hex_id`
+- This reuses all existing KIND 30889 broadcast logic from `freeze-wallets`
 
