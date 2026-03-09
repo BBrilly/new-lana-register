@@ -795,6 +795,36 @@ async function handleRegisterWithRegisteredLanas(
     );
   }
 
+  // Check if any wallet under this profile is frozen
+  const { data: frozenWallets, error: frozenError } = await supabase
+    .from("wallets")
+    .select("wallet_id, freeze_reason")
+    .eq("main_wallet_id", mainWallet.id)
+    .eq("frozen", true);
+
+  if (frozenError) {
+    console.error(`[${correlationId}] Error checking frozen wallets:`, frozenError);
+    return new Response(
+      JSON.stringify({ success: false, status: "error", error: "Database error while checking frozen status", correlation_id: correlationId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (frozenWallets && frozenWallets.length > 0) {
+    const frozenList = frozenWallets.map((w: any) => `${w.wallet_id} (${w.freeze_reason || 'frozen'})`);
+    console.log(`[${correlationId}] Registration blocked - profile has frozen wallets: ${JSON.stringify(frozenList)}`);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        status: "frozen_account",
+        error: "Registration blocked: the source account has frozen wallets. New wallet registration is not allowed for accounts with frozen wallets.",
+        frozen_wallets: frozenList,
+        correlation_id: correlationId
+      }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   // Get system parameters
   const sysParams = await getSystemParams(supabase, correlationId);
   if (!sysParams) {
