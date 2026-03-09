@@ -115,7 +115,9 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
   const isMainWallet = wallet.type.toLowerCase().includes("main");
   const isLana8Wonder = wallet.type.toLowerCase().includes("lana8wonder");
   
-  const cardBorderClass = isMainWallet 
+  const cardBorderClass = isFrozen
+    ? "border-blue-400/50 bg-blue-50/30 dark:bg-blue-950/20"
+    : isMainWallet 
     ? "border-success/50 bg-success/5" 
     : isLana8Wonder 
     ? "border-orange-500/50 bg-orange-500/5" 
