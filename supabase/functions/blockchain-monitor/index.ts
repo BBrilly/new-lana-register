@@ -57,6 +57,16 @@ Deno.serve(async (req) => {
     const currentSplit = systemParams?.split ? parseInt(systemParams.split, 10) : 0;
     console.log(`Current split value: ${currentSplit}`);
 
+    // Fetch auto-freeze threshold from app_settings
+    const { data: thresholdSetting } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'auto_freeze_threshold_lana')
+      .maybeSingle();
+
+    const autoFreezeThreshold = thresholdSetting?.value ? parseFloat(thresholdSetting.value) : null;
+    console.log(`Auto-freeze threshold: ${autoFreezeThreshold !== null ? autoFreezeThreshold + ' LANA' : 'not set'}`);
+
     // Enhanced RPC call function with retry logic
     async function rpcCall(method: string, params: any[] = [], retryCount = 0): Promise<any> {
       const payload = {
@@ -326,6 +336,20 @@ Deno.serve(async (req) => {
                         });
                         totalKnightsTransactions++;
                         console.log(`🏰 Knights wallet received ${receiver.amount} UNREGISTERED LANA from unregistered sender`);
+                      }
+
+                      // Auto-freeze: if unregistered LANA amount exceeds threshold
+                      if (autoFreezeThreshold !== null && receiver.amount >= autoFreezeThreshold) {
+                        const { error: freezeError } = await supabase
+                          .from('wallets')
+                          .update({ frozen: true, freeze_reason: 'frozen_unreg_Lanas' })
+                          .eq('id', receiverWallet!.id);
+
+                        if (freezeError) {
+                          console.error(`❌ Failed to auto-freeze wallet ${receiver.address}:`, freezeError);
+                        } else {
+                          console.log(`🧊 Auto-frozen wallet ${receiver.address} — received ${receiver.amount} LANA from unregistered sender (threshold: ${autoFreezeThreshold})`);
+                        }
                       }
                     }
                   }

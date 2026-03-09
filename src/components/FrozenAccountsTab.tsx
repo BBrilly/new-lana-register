@@ -15,12 +15,14 @@ const FREEZE_CODES = [
   { value: "frozen_l8w", label: "Late Wallet Registration" },
   { value: "frozen_max_cap", label: "Maximum Cap Exceeded" },
   { value: "frozen_too_wild", label: "Suspicious Activity" },
+  { value: "frozen_unreg_Lanas", label: "Unreg. Lanas Exceeded" },
 ];
 
 const FREEZE_LABELS: Record<string, string> = {
   frozen_l8w: "Late Registration",
   frozen_max_cap: "Max Cap Exceeded",
   frozen_too_wild: "Suspicious Activity",
+  frozen_unreg_Lanas: "Unreg. Lanas Exceeded",
 };
 
 interface FrozenWallet {

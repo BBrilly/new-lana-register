@@ -40,6 +40,7 @@ const FREEZE_LABELS: Record<string, string> = {
   frozen_l8w: "Late Registration",
   frozen_max_cap: "Max Cap Exceeded",
   frozen_too_wild: "Suspicious Activity",
+  frozen_unreg_Lanas: "Unreg. Lanas Exceeded",
 };
 
 const LandingPage = () => {

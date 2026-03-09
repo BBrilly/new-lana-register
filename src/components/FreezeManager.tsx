@@ -44,6 +44,7 @@ const FreezeManager = () => {
     { value: "frozen_l8w", label: "Late Wallet Registration", description: "Frozen due to late wallet registration" },
     { value: "frozen_max_cap", label: "Maximum Cap Exceeded", description: "Frozen due to maximum balance cap exceeded" },
     { value: "frozen_too_wild", label: "Suspicious Activity", description: "Frozen due to irregular or suspicious activity" },
+    { value: "frozen_unreg_Lanas", label: "Unregistered Lanas Exceeded", description: "Frozen due to receiving unregistered LANA exceeding threshold" },
   ];
 
   const handleSearch = async () => {

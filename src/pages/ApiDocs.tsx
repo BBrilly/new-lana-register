@@ -762,6 +762,10 @@ const ApiDocs = () => {
                       <TableCell className="font-mono text-sm"><code>frozen_too_wild</code></TableCell>
                       <TableCell className="text-muted-foreground">Frozen due to irregular or suspicious activity</TableCell>
                     </TableRow>
+                    <TableRow>
+                      <TableCell className="font-mono text-sm"><code>frozen_unreg_Lanas</code></TableCell>
+                      <TableCell className="text-muted-foreground">Frozen due to receiving unregistered LANA exceeding threshold</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </div>
@@ -779,7 +783,8 @@ const ApiDocs = () => {
 
 // Examples:
 ["w", "Labc123...", "Main Wallet", "LANA", "My wallet", "0", ""]           // unfrozen
-["w", "Lxyz789...", "Wallet",      "LANA", "",          "0", "frozen_l8w"]  // frozen`}
+["w", "Lxyz789...", "Wallet",      "LANA", "",          "0", "frozen_l8w"]  // frozen
+["w", "Ldef456...", "Wallet",      "LANA", "",          "0", "frozen_unreg_Lanas"]  // frozen - unreg lanas`}
                 sectionId="kind30889-wtag-format"
               />
             </div>
@@ -790,7 +795,7 @@ const ApiDocs = () => {
               <div className="space-y-3">
                 <div className="p-3 rounded-lg bg-muted/50 border border-border">
                   <p className="font-medium text-foreground">Registrar Software</p>
-                  <p className="text-sm text-muted-foreground">Must write the 7th field using only the three defined freeze codes, and/or set <code className="px-1 py-0.5 rounded bg-muted">status: frozen</code> when freezing at customer level.</p>
+                  <p className="text-sm text-muted-foreground">Must write the 7th field using only the defined freeze codes (<code className="px-1 py-0.5 rounded bg-muted">frozen_l8w</code>, <code className="px-1 py-0.5 rounded bg-muted">frozen_max_cap</code>, <code className="px-1 py-0.5 rounded bg-muted">frozen_too_wild</code>, <code className="px-1 py-0.5 rounded bg-muted">frozen_unreg_Lanas</code>), and/or set <code className="px-1 py-0.5 rounded bg-muted">status: frozen</code> when freezing at customer level.</p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50 border border-border">
                   <p className="font-medium text-foreground">User Wallets / Dashboards</p>
@@ -829,7 +834,7 @@ function getFreezeStatus(wTag) {
     return { frozen: false, reason: null };
   }
   
-  const KNOWN_CODES = ["frozen_l8w", "frozen_max_cap", "frozen_too_wild"];
+  const KNOWN_CODES = ["frozen_l8w", "frozen_max_cap", "frozen_too_wild", "frozen_unreg_Lanas"];
   const code = wTag[6];
   
   // Fail-safe: unknown codes are still treated as frozen
