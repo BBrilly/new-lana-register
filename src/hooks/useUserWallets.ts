@@ -80,6 +80,8 @@ export const useUserWallets = () => {
           events: [],
           notification: undefined,
           splitCreated: w.split_created,
+          frozen: w.frozen,
+          freezeReason: w.freeze_reason || undefined,
         }));
 
         // Sort wallets by type priority: Main → LanaPays.Us → Knights → others → Lana8Wonder

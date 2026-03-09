@@ -2,7 +2,7 @@ import { Wallet } from "@/types/wallet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink, Package, Pencil, X, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Trash2, Wallet as WalletIcon, Copy, Check, ExternalLink, Package, Pencil, X, Loader2, Snowflake } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -45,7 +45,9 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
     setIsEditingNotes(false);
   };
 
-  const canDelete = !["main", "lana8wonder", "knights", "lanaknights"].some(
+  const isFrozen = wallet.frozen === true;
+
+  const canDelete = !isFrozen && !["main", "lana8wonder", "knights", "lanaknights"].some(
     t => wallet.type.toLowerCase().includes(t)
   );
 
@@ -113,7 +115,9 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
   const isMainWallet = wallet.type.toLowerCase().includes("main");
   const isLana8Wonder = wallet.type.toLowerCase().includes("lana8wonder");
   
-  const cardBorderClass = isMainWallet 
+  const cardBorderClass = isFrozen
+    ? "border-blue-400/50 bg-blue-50/30 dark:bg-blue-950/20"
+    : isMainWallet 
     ? "border-success/50 bg-success/5" 
     : isLana8Wonder 
     ? "border-orange-500/50 bg-orange-500/5" 
@@ -132,6 +136,12 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
                 <h3 className="text-base sm:text-lg font-semibold text-foreground">{wallet.type}</h3>
                 {isMainWallet && <Badge className="bg-success/10 text-success">Main</Badge>}
                 {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
+                {isFrozen && (
+                  <Badge className="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 gap-1">
+                    <Snowflake className="h-3 w-3" />
+                    Frozen
+                  </Badge>
+                )}
                 {wallet.splitCreated != null && (
                   <Badge variant="outline" className="text-xs font-mono">Split #{wallet.splitCreated}</Badge>
                 )}
