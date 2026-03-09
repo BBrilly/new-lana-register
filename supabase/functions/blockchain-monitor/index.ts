@@ -356,7 +356,77 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Record block processing in database
+        // Process auto-freeze batch via freeze-wallets edge function (includes KIND 30889 broadcast)
+        if (walletsToAutoFreeze.size > 0) {
+          console.log(`🧊 Processing ${walletsToAutoFreeze.size} wallets for auto-freeze in block ${blockHeight}...`);
+          
+          // Group wallets by owner (nostr_hex_id) for batch processing
+          const walletsByOwner = new Map<string, string[]>();
+          
+          for (const [, freezeInfo] of walletsToAutoFreeze) {
+            // Look up the owner's nostr_hex_id via main_wallet_id
+            const { data: walletData } = await supabase
+              .from('wallets')
+              .select('main_wallet_id')
+              .eq('id', freezeInfo.walletUuid)
+              .single();
+            
+            if (!walletData) {
+              console.error(`❌ Could not find wallet ${freezeInfo.walletUuid} for freeze lookup`);
+              continue;
+            }
+            
+            const { data: mainWallet } = await supabase
+              .from('main_wallets')
+              .select('nostr_hex_id')
+              .eq('id', walletData.main_wallet_id)
+              .single();
+            
+            if (!mainWallet) {
+              console.error(`❌ Could not find main_wallet for wallet ${freezeInfo.walletUuid}`);
+              continue;
+            }
+            
+            const hexId = mainWallet.nostr_hex_id;
+            if (!walletsByOwner.has(hexId)) {
+              walletsByOwner.set(hexId, []);
+            }
+            walletsByOwner.get(hexId)!.push(freezeInfo.walletUuid);
+          }
+          
+          // Call freeze-wallets for each owner group
+          for (const [nostrHexId, walletUuids] of walletsByOwner) {
+            try {
+              const freezeResponse = await fetch(
+                `${supabaseUrl}/functions/v1/freeze-wallets`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`
+                  },
+                  body: JSON.stringify({
+                    wallet_ids: walletUuids,
+                    freeze: true,
+                    freeze_reason: 'frozen_unreg_Lanas',
+                    nostr_hex_id: nostrHexId
+                  })
+                }
+              );
+              
+              const freezeResult = await freezeResponse.json();
+              if (freezeResult.success) {
+                console.log(`🧊✅ Auto-frozen ${walletUuids.length} wallet(s) for owner ${nostrHexId.substring(0, 12)}... with KIND 30889 broadcast`);
+              } else {
+                console.error(`❌ freeze-wallets failed for owner ${nostrHexId.substring(0, 12)}...:`, freezeResult.error);
+              }
+            } catch (freezeCallError) {
+              console.error(`❌ Failed to call freeze-wallets for owner ${nostrHexId.substring(0, 12)}...:`, freezeCallError);
+            }
+          }
+        }
+
+
         const timeStaked = new Date(blockInfo.time * 1000);
         const { error: blockInsertError } = await supabase.from('block_tx').insert({
           block_id: blockHeight,
