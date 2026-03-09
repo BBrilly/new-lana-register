@@ -762,6 +762,10 @@ const ApiDocs = () => {
                       <TableCell className="font-mono text-sm"><code>frozen_too_wild</code></TableCell>
                       <TableCell className="text-muted-foreground">Frozen due to irregular or suspicious activity</TableCell>
                     </TableRow>
+                    <TableRow>
+                      <TableCell className="font-mono text-sm"><code>frozen_unreg_Lanas</code></TableCell>
+                      <TableCell className="text-muted-foreground">Frozen due to receiving unregistered LANA exceeding threshold</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </div>
