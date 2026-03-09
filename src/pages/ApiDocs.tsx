@@ -833,7 +833,7 @@ function getFreezeStatus(wTag) {
     return { frozen: false, reason: null };
   }
   
-  const KNOWN_CODES = ["frozen_l8w", "frozen_max_cap", "frozen_too_wild"];
+  const KNOWN_CODES = ["frozen_l8w", "frozen_max_cap", "frozen_too_wild", "frozen_unreg_Lanas"];
   const code = wTag[6];
   
   // Fail-safe: unknown codes are still treated as frozen
