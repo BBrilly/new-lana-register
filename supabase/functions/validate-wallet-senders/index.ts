@@ -480,11 +480,15 @@ async function checkSendersRegistration(
     }
   }
 
+  console.log(`[${correlationId}] Frozen senders found: ${frozenSenders.length}`);
+
   return {
     totalSenders: senders.length,
     registeredSenders: registeredSet.size,
     unregisteredSenders,
-    allRegistered: unregisteredSenders.length === 0
+    allRegistered: unregisteredSenders.length === 0,
+    frozenSenders,
+    hasFrozenSenders: frozenSenders.length > 0
   };
 }
 

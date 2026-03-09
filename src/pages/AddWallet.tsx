@@ -276,7 +276,11 @@ const AddWallet = () => {
         unregisteredSenders: senderData.unregisteredSenders,
       });
 
-      if (senderData.allRegistered) {
+      if (senderData.hasFrozenSenders) {
+        setSenderValidationError(
+          `Registration blocked: funds originate from ${senderData.frozenSenders.length} frozen wallet(s). Cannot register this wallet.`
+        );
+      } else if (senderData.allRegistered) {
         setSendersValid(true);
       } else {
         setSenderValidationError(
