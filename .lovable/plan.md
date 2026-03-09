@@ -1,20 +1,26 @@
 
 
-# Fix: Filter out registered wallets from Outgoing TX tab
+## Plan: Add Auto-Freeze Threshold Setting in Admin Panel
 
-## Problem
-The Outgoing TX tab shows transactions where `to_wallet_id IS NULL`, assuming the recipient is unregistered. But some destinations ARE registered — the `to_wallet_id` just wasn't linked at transaction recording time. Example: `LZAHDoeKaJ1uTwXZ3bL8dfbJXT7Af9a8sW` is in `wallets` table but appears in Outgoing TX because its transaction record has `to_wallet_id = NULL`.
+### What's already done
+- `blockchain-monitor` already reads `auto_freeze_threshold_lana` from `app_settings` and auto-freezes wallets with `frozen_unreg_Lanas` status
+- The `frozen_unreg_Lanas` status is already added across all UI components and API docs
 
-## Fix in `src/pages/LandingPage.tsx`
+### What's missing
+An Admin UI to **set/update** the `auto_freeze_threshold_lana` value in `app_settings`.
 
-After fetching transactions and parsing `toAddress` from notes, cross-reference all parsed destination addresses against the `wallets` table. Filter out any transaction where the destination address is actually registered.
+### Changes
 
-### Steps:
-1. Collect all parsed `toAddress` values from the transactions
-2. Query `wallets` table to check which of these addresses are registered: `SELECT wallet_id FROM wallets WHERE wallet_id IN (...parsedAddresses)`
-3. Build a `registeredAddressSet` from the results
-4. Filter out transactions where `registeredAddressSet.has(toAddress)` before setting state
-5. Keep the existing `deletedAddressSet` logic — deleted wallets should still show (with badge) since they are no longer active
+#### 1. Update `src/components/FreezeManager.tsx`
+Add a new section at the top of the component (before the Nostr Hex search):
+- On mount, fetch current value from `app_settings` where `key = 'auto_freeze_threshold_lana'`
+- Show an input field (number, in LANA) with the current threshold value
+- Save button that upserts to `app_settings` (insert if not exists, update if exists)
+- Display description: "Wallets receiving more than this amount of unregistered LANA will be automatically frozen with status `frozen_unreg_Lanas`"
 
-This ensures only truly unregistered destinations appear in the Outgoing TX tab.
+#### Technical Details
+- Use `useEffect` to load the current setting on mount
+- On save, use `supabase.from('app_settings').upsert({ key: 'auto_freeze_threshold_lana', value: inputValue, description: '...' }, { onConflict: 'key' })`
+- The `app_settings` table already has admin-only insert/update RLS policies, so this is secure
+- No database migration needed
 
