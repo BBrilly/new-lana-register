@@ -1,20 +1,12 @@
 
 
-# Fix: Filter out registered wallets from Outgoing TX tab
+# Completed: Add KIND 30889 broadcast to auto-freeze in blockchain-monitor
 
-## Problem
-The Outgoing TX tab shows transactions where `to_wallet_id IS NULL`, assuming the recipient is unregistered. But some destinations ARE registered — the `to_wallet_id` just wasn't linked at transaction recording time. Example: `LZAHDoeKaJ1uTwXZ3bL8dfbJXT7Af9a8sW` is in `wallets` table but appears in Outgoing TX because its transaction record has `to_wallet_id = NULL`.
+## What was done
+Updated `blockchain-monitor` to call the existing `freeze-wallets` edge function (via HTTP) instead of directly updating the `wallets` table. This ensures that when a wallet is auto-frozen due to receiving unregistered LANA above the threshold, a KIND 30889 event is also broadcast to Nostr relays.
 
-## Fix in `src/pages/LandingPage.tsx`
-
-After fetching transactions and parsing `toAddress` from notes, cross-reference all parsed destination addresses against the `wallets` table. Filter out any transaction where the destination address is actually registered.
-
-### Steps:
-1. Collect all parsed `toAddress` values from the transactions
-2. Query `wallets` table to check which of these addresses are registered: `SELECT wallet_id FROM wallets WHERE wallet_id IN (...parsedAddresses)`
-3. Build a `registeredAddressSet` from the results
-4. Filter out transactions where `registeredAddressSet.has(toAddress)` before setting state
-5. Keep the existing `deletedAddressSet` logic — deleted wallets should still show (with badge) since they are no longer active
-
-This ensures only truly unregistered destinations appear in the Outgoing TX tab.
-
+### Implementation
+- Wallets to freeze are collected in a `walletsToAutoFreeze` map during transaction processing
+- After all transactions in a block are processed, wallets are grouped by owner (`nostr_hex_id`)
+- For each owner group, `freeze-wallets` is called with `freeze_reason: 'frozen_unreg_Lanas'`
+- `freeze-wallets` handles both the DB update AND the KIND 30889 broadcast
