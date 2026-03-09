@@ -434,10 +434,11 @@ async function checkSendersRegistration(
 
     const { data: sampleRegistered } = await supabase
       .from('wallets')
-      .select('wallet_id')
+      .select('wallet_id, frozen')
       .in('wallet_id', sample);
 
     const sampleRegisteredSet = new Set((sampleRegistered || []).map((w: any) => w.wallet_id));
+    const sampleFrozen = (sampleRegistered || []).filter((w: any) => w.frozen).map((w: any) => w.wallet_id);
     const sampleUnregistered = sample.filter(s => !sampleRegisteredSet.has(s));
 
     if (sampleUnregistered.length >= MAX_UNREGISTERED) {
@@ -445,7 +446,9 @@ async function checkSendersRegistration(
         totalSenders: senders.length,
         registeredSenders: 0,
         unregisteredSenders: sampleUnregistered.slice(0, 10),
-        allRegistered: false
+        allRegistered: false,
+        frozenSenders: sampleFrozen,
+        hasFrozenSenders: sampleFrozen.length > 0
       };
     }
   }
