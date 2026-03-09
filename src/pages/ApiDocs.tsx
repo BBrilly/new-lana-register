@@ -783,7 +783,8 @@ const ApiDocs = () => {
 
 // Examples:
 ["w", "Labc123...", "Main Wallet", "LANA", "My wallet", "0", ""]           // unfrozen
-["w", "Lxyz789...", "Wallet",      "LANA", "",          "0", "frozen_l8w"]  // frozen`}
+["w", "Lxyz789...", "Wallet",      "LANA", "",          "0", "frozen_l8w"]  // frozen
+["w", "Ldef456...", "Wallet",      "LANA", "",          "0", "frozen_unreg_Lanas"]  // frozen - unreg lanas`}
                 sectionId="kind30889-wtag-format"
               />
             </div>
