@@ -1,20 +1,12 @@
 
 
-## Plan: Add `nostr_hex_id` to `simple_check_wallet_registration` response
+# Completed: Add KIND 30889 broadcast to auto-freeze in blockchain-monitor
 
-### Summary
-Add the owner's `nostr_hex_id` to the successful response when a wallet is found. Look it up via `main_wallet_id` → `main_wallets.nostr_hex_id`. Update API docs to match.
+## What was done
+Updated `blockchain-monitor` to call the existing `freeze-wallets` edge function (via HTTP) instead of directly updating the `wallets` table. This ensures that when a wallet is auto-frozen due to receiving unregistered LANA above the threshold, a KIND 30889 event is also broadcast to Nostr relays.
 
-### Changes
-
-#### 1. Update `supabase/functions/check/index.ts`
-- After finding the wallet, query `main_wallets` using `wallet.main_wallet_id` to get `nostr_hex_id`
-- Add `nostr_hex_id` to the response `wallet` object
-- If `main_wallets` lookup fails, return `nostr_hex_id: null` (don't break the response)
-
-#### 2. Update `src/pages/ApiDocs.tsx`
-- Update `simpleCheckFound` example (line 162-173) to include `"nostr_hex_id": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"`
-- Add `nostr_hex_id` description bullet in the Description section (line 627-644): "Returns the owner's `nostr_hex_id` for registered wallets"
-
-#### 3. Deploy edge function
-
+### Implementation
+- Wallets to freeze are collected in a `walletsToAutoFreeze` map during transaction processing
+- After all transactions in a block are processed, wallets are grouped by owner (`nostr_hex_id`)
+- For each owner group, `freeze-wallets` is called with `freeze_reason: 'frozen_unreg_Lanas'`
+- `freeze-wallets` handles both the DB update AND the KIND 30889 broadcast

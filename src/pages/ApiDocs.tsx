@@ -167,7 +167,8 @@ const ApiDocs = () => {
     "wallet_type": "Main Wallet",
     "main_wallet_id": "550e8400-e29b-41d4-a716-446655440000",
     "created_at": "2025-06-15T10:30:00.000Z",
-    "frozen": false
+    "frozen": false,
+    "nostr_hex_id": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
   },
   "correlation_id": "uuid-string"
 }`;
@@ -627,11 +628,15 @@ const ApiDocs = () => {
                 <ul className="mt-3 space-y-2 text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
-                    Returns wallet metadata (type, main_wallet_id, created_at, frozen) if registered
+                    Returns wallet metadata (type, main_wallet_id, created_at, frozen, nostr_hex_id) if registered
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
                     Returns <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">frozen: true/false</code> to indicate if the wallet is frozen
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    Returns the owner's <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">nostr_hex_id</code> (public key) for registered wallets
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
