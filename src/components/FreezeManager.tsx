@@ -276,46 +276,6 @@ const FreezeManager = () => {
 
   return (
     <div className="space-y-4">
-      {/* Auto-Freeze Threshold */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-primary" />
-            Auto-Freeze Threshold
-          </CardTitle>
-          <CardDescription>
-            Wallets receiving more than this amount of unregistered LANA will be automatically frozen with status <code className="text-xs bg-muted px-1 py-0.5 rounded">frozen_unreg_Lanas</code>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {thresholdLoading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : (
-            <div className="flex gap-2 items-center">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g. 100"
-                value={thresholdValue}
-                onChange={(e) => setThresholdValue(e.target.value)}
-                className="max-w-xs"
-              />
-              <span className="text-sm text-muted-foreground">LANA</span>
-              <Button
-                onClick={handleSaveThreshold}
-                disabled={thresholdSaving}
-                size="sm"
-                className="gap-2 ml-2"
-              >
-                {thresholdSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Search */}
       <Card>
         <CardHeader>

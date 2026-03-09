@@ -208,6 +208,11 @@ export class NostrClient {
         electrum: electrum.length > 0 ? electrum : content.electrum || [],
         fx,
         split,
+        split_target_lana,
+        split_started_at,
+        split_ends_at,
+        freeze_lana_account_above,
+        max_cap_lanas_on_split,
         version,
         valid_from,
         trusted_signers: content.trusted_signers || {

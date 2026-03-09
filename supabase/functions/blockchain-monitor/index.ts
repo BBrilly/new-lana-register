@@ -46,10 +46,10 @@ Deno.serve(async (req) => {
     const rpcUrl = `http://${RPC_HOST}:${RPC_PORT}/`;
     console.log(`Using RPC node: ${rpcNodes.name} (${RPC_HOST}:${RPC_PORT})`);
 
-    // Get current split value from system_parameters
+    // Get current split value and freeze threshold from system_parameters
     const { data: systemParams } = await supabase
       .from('system_parameters')
-      .select('split')
+      .select('split, freeze_lana_account_above')
       .order('fetched_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -57,15 +57,8 @@ Deno.serve(async (req) => {
     const currentSplit = systemParams?.split ? parseInt(systemParams.split, 10) : 0;
     console.log(`Current split value: ${currentSplit}`);
 
-    // Fetch auto-freeze threshold from app_settings
-    const { data: thresholdSetting } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'auto_freeze_threshold_lana')
-      .maybeSingle();
-
-    const autoFreezeThreshold = thresholdSetting?.value ? parseFloat(thresholdSetting.value) : null;
-    console.log(`Auto-freeze threshold: ${autoFreezeThreshold !== null ? autoFreezeThreshold + ' LANA' : 'not set'}`);
+    const autoFreezeThreshold = systemParams?.freeze_lana_account_above ? parseFloat(systemParams.freeze_lana_account_above) : null;
+    console.log(`Auto-freeze threshold (from KIND 38888): ${autoFreezeThreshold !== null ? autoFreezeThreshold + ' LANA' : 'not set'}`);
 
     // Enhanced RPC call function with retry logic
     async function rpcCall(method: string, params: any[] = [], retryCount = 0): Promise<any> {
