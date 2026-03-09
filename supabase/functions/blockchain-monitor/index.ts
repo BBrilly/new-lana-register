@@ -335,15 +335,15 @@ Deno.serve(async (req) => {
 
                       // Auto-freeze: if unregistered LANA amount exceeds threshold
                       if (autoFreezeThreshold !== null && receiver.amount >= autoFreezeThreshold) {
-                        const { error: freezeError } = await supabase
-                          .from('wallets')
-                          .update({ frozen: true, freeze_reason: 'frozen_unreg_Lanas' })
-                          .eq('id', receiverWallet!.id);
-
-                        if (freezeError) {
-                          console.error(`❌ Failed to auto-freeze wallet ${receiver.address}:`, freezeError);
-                        } else {
-                          console.log(`🧊 Auto-frozen wallet ${receiver.address} — received ${receiver.amount} LANA from unregistered sender (threshold: ${autoFreezeThreshold})`);
+                        const recvWallet = walletMap.get(receiver.address);
+                        if (recvWallet) {
+                          walletsToAutoFreeze.set(recvWallet.id, {
+                            walletUuid: recvWallet.id,
+                            mainWalletId: '', // will be looked up later
+                            address: receiver.address,
+                            amount: receiver.amount
+                          });
+                          console.log(`🧊 Queued auto-freeze for ${receiver.address} — received ${receiver.amount} LANA from unregistered sender (threshold: ${autoFreezeThreshold})`);
                         }
                       }
                     }
