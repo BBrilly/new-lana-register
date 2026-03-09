@@ -136,6 +136,12 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
                 <h3 className="text-base sm:text-lg font-semibold text-foreground">{wallet.type}</h3>
                 {isMainWallet && <Badge className="bg-success/10 text-success">Main</Badge>}
                 {isLana8Wonder && <Badge className="bg-orange-500/10 text-orange-500">Lana8Wonder</Badge>}
+                {isFrozen && (
+                  <Badge className="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 gap-1">
+                    <Snowflake className="h-3 w-3" />
+                    Frozen
+                  </Badge>
+                )}
                 {wallet.splitCreated != null && (
                   <Badge variant="outline" className="text-xs font-mono">Split #{wallet.splitCreated}</Badge>
                 )}

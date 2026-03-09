@@ -8,6 +8,8 @@ export interface Wallet {
   events: WalletEvent[];
   notification?: WalletNotification;
   splitCreated?: number | null;
+  frozen?: boolean;
+  freezeReason?: string;
 }
 
 export interface WalletEvent {
