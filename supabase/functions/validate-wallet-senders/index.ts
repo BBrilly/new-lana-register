@@ -458,14 +458,17 @@ async function checkSendersRegistration(
 
     const { data: registered } = await supabase
       .from('wallets')
-      .select('wallet_id')
+      .select('wallet_id, frozen')
       .in('wallet_id', batch);
 
-    const batchRegisteredSet = new Set((registered || []).map((w: any) => w.wallet_id));
+    const batchRegisteredMap = new Map((registered || []).map((w: any) => [w.wallet_id, w.frozen]));
 
     for (const sender of batch) {
-      if (batchRegisteredSet.has(sender)) {
+      if (batchRegisteredMap.has(sender)) {
         registeredSet.add(sender);
+        if (batchRegisteredMap.get(sender)) {
+          frozenSenders.push(sender);
+        }
       } else {
         unregisteredSenders.push(sender);
       }
