@@ -417,7 +417,7 @@ async function checkSendersRegistration(
   correlationId: string
 ): Promise<SenderValidationResult> {
   if (senders.length === 0) {
-    return { totalSenders: 0, registeredSenders: 0, unregisteredSenders: [], allRegistered: true };
+    return { totalSenders: 0, registeredSenders: 0, unregisteredSenders: [], allRegistered: true, frozenSenders: [], hasFrozenSenders: false };
   }
 
   const BATCH_SIZE = 50;
