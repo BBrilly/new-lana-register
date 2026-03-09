@@ -24,6 +24,11 @@ interface SystemParameters {
     GBP: number;
   };
   split: string;
+  split_target_lana: string;
+  split_started_at: string;
+  split_ends_at: string;
+  freeze_lana_account_above: string;
+  max_cap_lanas_on_split: string;
   version: string;
   valid_from: string;
   trusted_signers: {
@@ -62,6 +67,11 @@ function parseKind38888Event(event: Event): SystemParameters | null {
 
     // Extract split, version, valid_from
     const split = event.tags.find(t => t[0] === 'split')?.[1] || '0';
+    const split_target_lana = event.tags.find(t => t[0] === 'split_target_lana')?.[1] || '0';
+    const split_started_at = event.tags.find(t => t[0] === 'split_started_at')?.[1] || '0';
+    const split_ends_at = event.tags.find(t => t[0] === 'split_ends_at')?.[1] || '0';
+    const freeze_lana_account_above = event.tags.find(t => t[0] === 'freeze_lana_account_above')?.[1] || '0';
+    const max_cap_lanas_on_split = event.tags.find(t => t[0] === 'max_cap_lanas_on_split')?.[1] || '0';
     const version = event.tags.find(t => t[0] === 'version')?.[1] || '0';
     const valid_from = event.tags.find(t => t[0] === 'valid_from')?.[1] || '0';
 
@@ -70,6 +80,11 @@ function parseKind38888Event(event: Event): SystemParameters | null {
       electrum: electrum.length > 0 ? electrum : content.electrum || [],
       fx,
       split,
+      split_target_lana,
+      split_started_at,
+      split_ends_at,
+      freeze_lana_account_above,
+      max_cap_lanas_on_split,
       version,
       valid_from,
       trusted_signers: content.trusted_signers || {
@@ -231,6 +246,11 @@ Deno.serve(async (req) => {
       electrum: parameters.electrum,
       fx: parameters.fx,
       split: parameters.split,
+      split_target_lana: parameters.split_target_lana,
+      split_started_at: parameters.split_started_at,
+      split_ends_at: parameters.split_ends_at,
+      freeze_lana_account_above: parameters.freeze_lana_account_above,
+      max_cap_lanas_on_split: parameters.max_cap_lanas_on_split,
       version: parameters.version,
       valid_from: parameters.valid_from,
       trusted_signers: parameters.trusted_signers,

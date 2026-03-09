@@ -346,12 +346,17 @@ export type Database = {
           electrum: Json
           event_id: string
           fetched_at: string | null
+          freeze_lana_account_above: string | null
           fx: Json
           id: string
+          max_cap_lanas_on_split: string | null
           pubkey: string
           raw_event: Json
           relays: Json
           split: string
+          split_ends_at: string | null
+          split_started_at: string | null
+          split_target_lana: string | null
           trusted_signers: Json
           updated_at: string | null
           valid_from: string
@@ -362,12 +367,17 @@ export type Database = {
           electrum: Json
           event_id: string
           fetched_at?: string | null
+          freeze_lana_account_above?: string | null
           fx: Json
           id?: string
+          max_cap_lanas_on_split?: string | null
           pubkey: string
           raw_event: Json
           relays: Json
           split: string
+          split_ends_at?: string | null
+          split_started_at?: string | null
+          split_target_lana?: string | null
           trusted_signers: Json
           updated_at?: string | null
           valid_from: string
@@ -378,12 +388,17 @@ export type Database = {
           electrum?: Json
           event_id?: string
           fetched_at?: string | null
+          freeze_lana_account_above?: string | null
           fx?: Json
           id?: string
+          max_cap_lanas_on_split?: string | null
           pubkey?: string
           raw_event?: Json
           relays?: Json
           split?: string
+          split_ends_at?: string | null
+          split_started_at?: string | null
+          split_target_lana?: string | null
           trusted_signers?: Json
           updated_at?: string | null
           valid_from?: string
