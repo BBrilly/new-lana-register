@@ -211,6 +211,8 @@ Deno.serve(async (req) => {
     for (const blockHeight of blocksThisRun) {
       try {
         console.log(`Processing block ${blockHeight}...`);
+        // Collect wallets to auto-freeze after all transactions in this block
+        const walletsToAutoFreeze = new Map<string, { walletUuid: string; mainWalletId: string; address: string; amount: number }>();
 
         // Get block hash and block info (without verbosity parameter)
         const blockHash = await rpcCall('getblockhash', [blockHeight]);
