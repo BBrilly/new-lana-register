@@ -15,6 +15,8 @@ interface SenderValidationResult {
   registeredSenders: number;
   unregisteredSenders: string[];
   allRegistered: boolean;
+  frozenSenders: string[];
+  hasFrozenSenders: boolean;
 }
 
 // Connect to Electrum and send/receive JSON-RPC
