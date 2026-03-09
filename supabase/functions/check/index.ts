@@ -107,6 +107,19 @@ Deno.serve(async (req) => {
     }
 
     if (wallet) {
+      // Lookup owner's nostr_hex_id from main_wallets
+      let nostrHexId: string | null = null;
+      try {
+        const { data: mainWallet } = await supabase
+          .from("main_wallets")
+          .select("nostr_hex_id")
+          .eq("id", wallet.main_wallet_id)
+          .maybeSingle();
+        nostrHexId = mainWallet?.nostr_hex_id ?? null;
+      } catch (e) {
+        console.error(`[${correlationId}] Failed to lookup nostr_hex_id:`, e);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -117,6 +130,7 @@ Deno.serve(async (req) => {
             main_wallet_id: wallet.main_wallet_id,
             created_at: wallet.created_at,
             frozen: wallet.frozen ?? false,
+            nostr_hex_id: nostrHexId,
           },
           correlation_id: correlationId,
         }),
