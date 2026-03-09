@@ -167,7 +167,8 @@ const ApiDocs = () => {
     "wallet_type": "Main Wallet",
     "main_wallet_id": "550e8400-e29b-41d4-a716-446655440000",
     "created_at": "2025-06-15T10:30:00.000Z",
-    "frozen": false
+    "frozen": false,
+    "nostr_hex_id": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
   },
   "correlation_id": "uuid-string"
 }`;
