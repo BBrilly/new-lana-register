@@ -15,6 +15,8 @@ interface SenderValidationResult {
   registeredSenders: number;
   unregisteredSenders: string[];
   allRegistered: boolean;
+  frozenSenders: string[];
+  hasFrozenSenders: boolean;
 }
 
 // Connect to Electrum and send/receive JSON-RPC
@@ -415,13 +417,14 @@ async function checkSendersRegistration(
   correlationId: string
 ): Promise<SenderValidationResult> {
   if (senders.length === 0) {
-    return { totalSenders: 0, registeredSenders: 0, unregisteredSenders: [], allRegistered: true };
+    return { totalSenders: 0, registeredSenders: 0, unregisteredSenders: [], allRegistered: true, frozenSenders: [], hasFrozenSenders: false };
   }
 
   const BATCH_SIZE = 50;
   const MAX_UNREGISTERED = 5;
   const registeredSet = new Set<string>();
   const unregisteredSenders: string[] = [];
+  const frozenSenders: string[] = [];
 
   // Smart sampling for large sender lists
   if (senders.length > 100) {
@@ -431,10 +434,11 @@ async function checkSendersRegistration(
 
     const { data: sampleRegistered } = await supabase
       .from('wallets')
-      .select('wallet_id')
+      .select('wallet_id, frozen')
       .in('wallet_id', sample);
 
     const sampleRegisteredSet = new Set((sampleRegistered || []).map((w: any) => w.wallet_id));
+    const sampleFrozen = (sampleRegistered || []).filter((w: any) => w.frozen).map((w: any) => w.wallet_id);
     const sampleUnregistered = sample.filter(s => !sampleRegisteredSet.has(s));
 
     if (sampleUnregistered.length >= MAX_UNREGISTERED) {
@@ -442,7 +446,9 @@ async function checkSendersRegistration(
         totalSenders: senders.length,
         registeredSenders: 0,
         unregisteredSenders: sampleUnregistered.slice(0, 10),
-        allRegistered: false
+        allRegistered: false,
+        frozenSenders: sampleFrozen,
+        hasFrozenSenders: sampleFrozen.length > 0
       };
     }
   }
@@ -452,14 +458,17 @@ async function checkSendersRegistration(
 
     const { data: registered } = await supabase
       .from('wallets')
-      .select('wallet_id')
+      .select('wallet_id, frozen')
       .in('wallet_id', batch);
 
-    const batchRegisteredSet = new Set((registered || []).map((w: any) => w.wallet_id));
+    const batchRegisteredMap = new Map((registered || []).map((w: any) => [w.wallet_id, w.frozen]));
 
     for (const sender of batch) {
-      if (batchRegisteredSet.has(sender)) {
+      if (batchRegisteredMap.has(sender)) {
         registeredSet.add(sender);
+        if (batchRegisteredMap.get(sender)) {
+          frozenSenders.push(sender);
+        }
       } else {
         unregisteredSenders.push(sender);
       }
@@ -471,11 +480,15 @@ async function checkSendersRegistration(
     }
   }
 
+  console.log(`[${correlationId}] Frozen senders found: ${frozenSenders.length}`);
+
   return {
     totalSenders: senders.length,
     registeredSenders: registeredSet.size,
     unregisteredSenders,
-    allRegistered: unregisteredSenders.length === 0
+    allRegistered: unregisteredSenders.length === 0,
+    frozenSenders,
+    hasFrozenSenders: frozenSenders.length > 0
   };
 }
 
