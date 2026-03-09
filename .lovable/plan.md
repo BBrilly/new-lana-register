@@ -1,20 +1,38 @@
 
 
-# Fix: Filter out registered wallets from Outgoing TX tab
+## Plan: Move freeze threshold from Admin UI to KIND 38888 system parameters
 
-## Problem
-The Outgoing TX tab shows transactions where `to_wallet_id IS NULL`, assuming the recipient is unregistered. But some destinations ARE registered — the `to_wallet_id` just wasn't linked at transaction recording time. Example: `LZAHDoeKaJ1uTwXZ3bL8dfbJXT7Af9a8sW` is in `wallets` table but appears in Outgoing TX because its transaction record has `to_wallet_id = NULL`.
+### Summary
+Remove the auto-freeze threshold input from Admin panel. Instead, parse `freeze_lana_account_above` and `max_cap_lanas_on_split` from the KIND 38888 event (already published on Nostr) and store them in the `system_parameters` table. The `blockchain-monitor` edge function will read the threshold from `system_parameters` instead of `app_settings`.
 
-## Fix in `src/pages/LandingPage.tsx`
+### Changes
 
-After fetching transactions and parsing `toAddress` from notes, cross-reference all parsed destination addresses against the `wallets` table. Filter out any transaction where the destination address is actually registered.
+#### 1. Database migration — add new columns to `system_parameters`
+Add columns for the new KIND 38888 tags:
+- `freeze_lana_account_above` (text, nullable)
+- `max_cap_lanas_on_split` (text, nullable)
+- `split_target_lana` (text, nullable)
+- `split_started_at` (text, nullable)
+- `split_ends_at` (text, nullable)
 
-### Steps:
-1. Collect all parsed `toAddress` values from the transactions
-2. Query `wallets` table to check which of these addresses are registered: `SELECT wallet_id FROM wallets WHERE wallet_id IN (...parsedAddresses)`
-3. Build a `registeredAddressSet` from the results
-4. Filter out transactions where `registeredAddressSet.has(toAddress)` before setting state
-5. Keep the existing `deletedAddressSet` logic — deleted wallets should still show (with badge) since they are no longer active
+#### 2. Update `supabase/functions/sync-system-parameters/index.ts`
+- Parse new tags from the KIND 38888 event: `freeze_lana_account_above`, `max_cap_lanas_on_split`, `split_target_lana`, `split_started_at`, `split_ends_at`
+- Add these fields to the `SystemParameters` interface and `parseKind38888Event` function
+- Include them in the `newData` object that gets upserted to the database
+- Redeploy the edge function
 
-This ensures only truly unregistered destinations appear in the Outgoing TX tab.
+#### 3. Update `supabase/functions/blockchain-monitor/index.ts`
+- Remove the `app_settings` query for `auto_freeze_threshold_lana`
+- Instead, read `freeze_lana_account_above` from the `system_parameters` table (already fetched alongside `split`)
+- Use this value as the auto-freeze threshold
+
+#### 4. Update `src/components/FreezeManager.tsx`
+- Remove the entire Auto-Freeze Threshold card (lines 279–317)
+- Remove related state variables (`thresholdValue`, `thresholdLoading`, `thresholdSaving`)
+- Remove `useEffect` for fetching threshold and `handleSaveThreshold` function
+- Remove unused imports (`Settings`, `Save`)
+
+#### 5. Update `src/utils/nostrClient.ts`
+- Add new fields to the `SystemParameters` interface: `freeze_lana_account_above`, `max_cap_lanas_on_split`, `split_target_lana`, `split_started_at`, `split_ends_at`
+- Parse these tags in `parseEventContent`
 
