@@ -40,6 +40,51 @@ const FreezeManager = () => {
   const [freezeDialogOpen, setFreezeDialogOpen] = useState(false);
   const [freezeReason, setFreezeReason] = useState("frozen_l8w");
 
+  // Auto-freeze threshold state
+  const [thresholdValue, setThresholdValue] = useState("");
+  const [thresholdLoading, setThresholdLoading] = useState(true);
+  const [thresholdSaving, setThresholdSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchThreshold = async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "auto_freeze_threshold_lana")
+        .maybeSingle();
+      if (data) setThresholdValue(data.value);
+      setThresholdLoading(false);
+    };
+    fetchThreshold();
+  }, []);
+
+  const handleSaveThreshold = async () => {
+    const num = parseFloat(thresholdValue);
+    if (isNaN(num) || num <= 0) {
+      toast.error("Enter a valid positive number");
+      return;
+    }
+    setThresholdSaving(true);
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert(
+          {
+            key: "auto_freeze_threshold_lana",
+            value: num.toString(),
+            description: "Auto-freeze threshold: wallets receiving more than this amount of unregistered LANA get frozen",
+          },
+          { onConflict: "key" }
+        );
+      if (error) throw error;
+      toast.success("Auto-freeze threshold saved");
+    } catch (err: any) {
+      toast.error(err.message || "Error saving threshold");
+    } finally {
+      setThresholdSaving(false);
+    }
+  };
+
   const FREEZE_CODES = [
     { value: "frozen_l8w", label: "Late Wallet Registration", description: "Frozen due to late wallet registration" },
     { value: "frozen_max_cap", label: "Maximum Cap Exceeded", description: "Frozen due to maximum balance cap exceeded" },
