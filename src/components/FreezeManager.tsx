@@ -66,16 +66,28 @@ const FreezeManager = () => {
     }
     setThresholdSaving(true);
     try {
-      const { error } = await supabase
+      // Check if setting already exists
+      const { data: existing } = await supabase
         .from("app_settings")
-        .upsert(
-          {
+        .select("id")
+        .eq("key", "auto_freeze_threshold_lana")
+        .maybeSingle();
+
+      let error;
+      if (existing) {
+        ({ error } = await supabase
+          .from("app_settings")
+          .update({ value: num.toString() })
+          .eq("key", "auto_freeze_threshold_lana"));
+      } else {
+        ({ error } = await supabase
+          .from("app_settings")
+          .insert({
             key: "auto_freeze_threshold_lana",
             value: num.toString(),
             description: "Auto-freeze threshold: wallets receiving more than this amount of unregistered LANA get frozen",
-          },
-          { onConflict: "key" }
-        );
+          }));
+      }
       if (error) throw error;
       toast.success("Auto-freeze threshold saved");
     } catch (err: any) {
