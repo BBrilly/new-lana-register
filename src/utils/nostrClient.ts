@@ -16,6 +16,11 @@ export interface SystemParameters {
     GBP: number;
   };
   split: string;
+  split_target_lana: string;
+  split_started_at: string;
+  split_ends_at: string;
+  freeze_lana_account_above: string;
+  max_cap_lanas_on_split: string;
   version: string;
   valid_from: string;
   trusted_signers: {
