@@ -81,11 +81,16 @@ function base58Decode(encoded: string): Uint8Array {
   return bytes;
 }
 
-// Convert WIF to raw private key hex
-async function wifToPrivateKey(wif: string): Promise<string> {
+// Convert WIF to raw private key hex — supports BOTH formats
+// Format 1: prefix 0xb0 (starts with '6'), uncompressed, 51 chars
+// Format 2: prefix 0x41 (starts with 'T'), compressed, 52 chars
+async function wifToPrivateKey(wif: string): Promise<{ privateKeyHex: string; isCompressed: boolean }> {
   try {
+    // Normalize — strip invisible Unicode chars
+    const normalized = wif.replace(/[\s\u200B-\u200D\uFEFF\r\n\t]/g, '').trim();
+    
     // Decode Base58
-    const decoded = base58Decode(wif);
+    const decoded = base58Decode(normalized);
     
     // Extract components
     const payload = decoded.slice(0, -4);
@@ -101,41 +106,55 @@ async function wifToPrivateKey(wif: string): Promise<string> {
       }
     }
     
-    // Verify prefix (0xb0 for LanaCoin)
-    if (payload[0] !== 0xb0) {
-      throw new Error('Invalid WIF prefix');
+    // Verify prefix — accept BOTH formats
+    // 0xb0 (176) = old uncompressed format (starts with '6')
+    // 0x41 (65) = new compressed format (starts with 'T')
+    if (payload[0] !== 0xb0 && payload[0] !== 0x41) {
+      throw new Error(`Invalid WIF prefix: 0x${payload[0].toString(16)}. Expected 0xb0 or 0x41`);
     }
     
-    // Extract private key (32 bytes after prefix)
+    // Detect compression:
+    // 33 bytes = version(1) + key(32) → uncompressed
+    // 34 bytes = version(1) + key(32) + flag(1) → compressed
+    const isCompressed = payload.length === 34 && payload[33] === 0x01;
+    
+    // Extract private key (32 bytes after prefix — same slice for both)
     const privateKey = payload.slice(1, 33);
-    return bytesToHex(privateKey);
+    return { privateKeyHex: bytesToHex(privateKey), isCompressed };
     
   } catch (error) {
     throw new Error(`Invalid WIF format: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-// Generate uncompressed public key from private key
-function generatePublicKey(privateKeyHex: string): string {
+// Generate uncompressed public key from private key (65 bytes: 04 + x + y)
+function generateUncompressedPublicKey(privateKeyHex: string): string {
   const keyPair = ec.keyFromPrivate(privateKeyHex);
   const pubKeyPoint = keyPair.getPublic();
   
-  // Return uncompressed format (04 + x + y coordinates)
   return "04" + 
          pubKeyPoint.getX().toString(16).padStart(64, '0') + 
          pubKeyPoint.getY().toString(16).padStart(64, '0');
 }
 
-// Generate compressed public key for Nostr (x-only)
+// Generate compressed public key from private key (33 bytes: 02/03 + x)
+function generateCompressedPublicKey(privateKeyHex: string): string {
+  const keyPair = ec.keyFromPrivate(privateKeyHex);
+  const pubKeyPoint = keyPair.getPublic();
+  
+  const prefix = pubKeyPoint.getY().isEven() ? '02' : '03';
+  return prefix + pubKeyPoint.getX().toString(16).padStart(64, '0');
+}
+
+// Generate Nostr public key (x-only, same as compressed without prefix)
 function deriveNostrPublicKey(privateKeyHex: string): string {
   const keyPair = ec.keyFromPrivate(privateKeyHex);
   const pubKeyPoint = keyPair.getPublic();
   
-  // Return only x-coordinate (32 bytes)
   return pubKeyPoint.getX().toString(16).padStart(64, '0');
 }
 
-// Generate LanaCoin wallet address from public key
+// Generate LanaCoin wallet address from public key hex
 async function generateLanaAddress(publicKeyHex: string): Promise<string> {
   // Step 1: SHA-256 of public key
   const sha256Hash = await sha256(publicKeyHex);
@@ -168,6 +187,9 @@ export interface WifAuthResult {
   nostrHexId: string;
   nostrNpubId: string;
   nostrPrivateKey: string;
+  isCompressed: boolean;
+  compressedAddress: string;
+  uncompressedAddress: string;
 }
 
 export interface UserProfile {
@@ -185,24 +207,35 @@ export interface UserProfile {
 }
 
 // Main function to convert WIF to all derived identifiers
+// Supports BOTH WIF formats:
+//   - Old: prefix '6' (0xb0), uncompressed, 51 chars
+//   - New: prefix 'T' (0x41), compressed, 52 chars
 export async function convertWifToIds(wif: string): Promise<WifAuthResult> {
   try {
-    // Step 1: Extract private key from WIF
-    const privateKeyHex = await wifToPrivateKey(wif);
+    // Step 1: Extract private key from WIF (supports both formats)
+    const { privateKeyHex, isCompressed } = await wifToPrivateKey(wif);
     
-    // Step 2: Generate public keys
-    const publicKeyHex = generatePublicKey(privateKeyHex);
+    // Step 2: Generate BOTH public key types
+    const uncompressedPubKeyHex = generateUncompressedPublicKey(privateKeyHex);
+    const compressedPubKeyHex = generateCompressedPublicKey(privateKeyHex);
     const nostrHexId = deriveNostrPublicKey(privateKeyHex);
     
-    // Step 3: Generate addresses/identifiers
-    const walletId = await generateLanaAddress(publicKeyHex);
+    // Step 3: Generate BOTH addresses
+    const uncompressedAddress = await generateLanaAddress(uncompressedPubKeyHex);
+    const compressedAddress = await generateLanaAddress(compressedPubKeyHex);
+    
+    // The "primary" wallet ID depends on the WIF compression flag
+    const walletId = isCompressed ? compressedAddress : uncompressedAddress;
     const nostrNpubId = hexToNpub(nostrHexId);
     
     return {
       walletId,
       nostrHexId,
       nostrNpubId,
-      nostrPrivateKey: privateKeyHex
+      nostrPrivateKey: privateKeyHex,
+      isCompressed,
+      compressedAddress,
+      uncompressedAddress,
     };
     
   } catch (error) {
