@@ -467,9 +467,15 @@ async function buildSignedTx(
   const totalAmount = recipients.reduce((sum: number, r: any) => sum + r.amount, 0);
   const totalValue = selectedUTXOs.reduce((sum: number, utxo: any) => sum + utxo.value, 0);
   
-  const privateKeyBytes = base58CheckDecode(privateKeyWIF);
-  const privateKeyHex = uint8ArrayToHex(privateKeyBytes.slice(1));
-  const publicKey = privateKeyToPublicKey(privateKeyHex);
+  // Decode WIF and detect compression
+  const { privateKeyHex, isCompressed } = decodeWifKey(privateKeyWIF);
+  
+  // Use the correct public key type based on WIF format
+  const publicKey = isCompressed 
+    ? privateKeyToCompressedPublicKey(privateKeyHex)
+    : privateKeyToUncompressedPublicKey(privateKeyHex);
+  
+  console.log(`🔑 Using ${isCompressed ? 'compressed (33-byte)' : 'uncompressed (65-byte)'} public key`);
   
   const outputs = [];
   for (const recipient of recipients) {
