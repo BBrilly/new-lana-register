@@ -780,16 +780,22 @@ serve(async (req) => {
       throw new Error('Missing required Nostr event parameters');
     }
     
-    // Validate private key matches sender address
-    const privateKeyBytes = base58CheckDecode(private_key);
-    const privateKeyHex = uint8ArrayToHex(privateKeyBytes.slice(1));
-    const generatedPubKey = privateKeyToPublicKey(privateKeyHex);
-    const expectedAddress = await publicKeyToAddress(generatedPubKey);
+    // Validate private key matches sender address (supports both WIF formats)
+    const { privateKeyHex, isCompressed } = decodeWifKey(private_key);
     
-    if (expectedAddress !== sender_address) {
-      throw new Error(`Private key does not match sender address`);
+    // Generate both address types and check which one matches
+    const uncompressedPubKey = privateKeyToUncompressedPublicKey(privateKeyHex);
+    const compressedPubKey = privateKeyToCompressedPublicKey(privateKeyHex);
+    const uncompressedAddress = await publicKeyToAddress(uncompressedPubKey);
+    const compressedAddress = await publicKeyToAddress(compressedPubKey);
+    
+    const matchesCompressed = compressedAddress === sender_address;
+    const matchesUncompressed = uncompressedAddress === sender_address;
+    
+    if (!matchesCompressed && !matchesUncompressed) {
+      throw new Error(`Private key does not match sender address. Expected: ${sender_address}, got compressed: ${compressedAddress}, uncompressed: ${uncompressedAddress}`);
     }
-    console.log('✅ Private key validation passed');
+    console.log(`✅ Private key validation passed (${matchesCompressed ? 'compressed' : 'uncompressed'} key match)`);
     
     const servers = electrum_servers && electrum_servers.length > 0
       ? electrum_servers
