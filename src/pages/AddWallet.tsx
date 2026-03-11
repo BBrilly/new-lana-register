@@ -40,7 +40,7 @@ const AddWallet = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isValid, setIsValid] = useState(false);
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Registered Lanas validation
   const [isValidatingSenders, setIsValidatingSenders] = useState(false);
@@ -55,7 +55,7 @@ const AddWallet = () => {
   const [isAddressValid, setIsAddressValid] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [isCheckingAddress, setIsCheckingAddress] = useState(false);
-  const senderValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const senderValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchWalletTypes = async () => {
