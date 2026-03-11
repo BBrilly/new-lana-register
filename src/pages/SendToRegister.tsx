@@ -171,15 +171,21 @@ const SendToRegister = () => {
     setIsSending(true);
     
     try {
-      // Validate that WIF matches the sender wallet address
+      // Validate that WIF matches the sender wallet address (supports both compressed and uncompressed)
       toast.info('Validating private key...');
       const wifResult = await convertWifToIds(privateKey.trim());
       
-      if (wifResult.walletId !== fromWallet) {
-        toast.error(`Private key does not match sender wallet. Expected: ${fromWallet}, Got: ${wifResult.walletId}`);
+      // Check if EITHER derived address matches the sender wallet
+      const matchesCompressed = wifResult.compressedAddress === fromWallet;
+      const matchesUncompressed = wifResult.uncompressedAddress === fromWallet;
+      
+      if (!matchesCompressed && !matchesUncompressed) {
+        toast.error(`Private key does not match sender wallet. Expected: ${fromWallet}, Got compressed: ${wifResult.compressedAddress}, uncompressed: ${wifResult.uncompressedAddress}`);
         setIsSending(false);
         return;
       }
+      
+      console.log(`WIF matched via ${matchesCompressed ? 'compressed' : 'uncompressed'} key type`);
       
       toast.success('Private key validated successfully');
       // Get user session for pubkey
