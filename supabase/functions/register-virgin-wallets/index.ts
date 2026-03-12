@@ -68,7 +68,7 @@ function createSignedEvent(
   return finalizeEvent(event, privateKeyBytes);
 }
 
-// Broadcast event to relays with detailed logging
+// Broadcast event to relays with detailed logging and 8s timeout
 async function broadcastToRelays(
   pool: SimplePool,
   relays: string[],
@@ -77,8 +77,20 @@ async function broadcastToRelays(
 ): Promise<{ success: boolean; eventId: string; acceptedRelays: number; failedRelays: number }> {
   try {
     const promises = pool.publish(relays, event);
-    const results = await Promise.allSettled(promises);
-    
+    const timeoutPromise = new Promise<"timeout">(resolve =>
+      setTimeout(() => resolve("timeout"), 8000)
+    );
+    const raceResult = await Promise.race([
+      Promise.allSettled(promises),
+      timeoutPromise
+    ]);
+
+    if (raceResult === "timeout") {
+      console.warn(`[${correlationId}] KIND ${event.kind} broadcast timed out after 8s`);
+      return { success: true, eventId: event.id, acceptedRelays: 0, failedRelays: relays.length };
+    }
+
+    const results = raceResult as PromiseSettledResult<any>[];
     let accepted = 0;
     let failed = 0;
     
