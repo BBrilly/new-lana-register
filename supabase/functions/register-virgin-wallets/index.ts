@@ -68,7 +68,7 @@ function createSignedEvent(
   return finalizeEvent(event, privateKeyBytes);
 }
 
-// Broadcast event to relays with detailed logging
+// Broadcast event to relays with detailed logging and 8s timeout
 async function broadcastToRelays(
   pool: SimplePool,
   relays: string[],
@@ -77,8 +77,20 @@ async function broadcastToRelays(
 ): Promise<{ success: boolean; eventId: string; acceptedRelays: number; failedRelays: number }> {
   try {
     const promises = pool.publish(relays, event);
-    const results = await Promise.allSettled(promises);
-    
+    const timeoutPromise = new Promise<"timeout">(resolve =>
+      setTimeout(() => resolve("timeout"), 8000)
+    );
+    const raceResult = await Promise.race([
+      Promise.allSettled(promises),
+      timeoutPromise
+    ]);
+
+    if (raceResult === "timeout") {
+      console.warn(`[${correlationId}] KIND ${event.kind} broadcast timed out after 8s`);
+      return { success: true, eventId: event.id, acceptedRelays: 0, failedRelays: relays.length };
+    }
+
+    const results = raceResult as PromiseSettledResult<any>[];
     let accepted = 0;
     let failed = 0;
     
@@ -427,56 +439,66 @@ async function handleCheckWallet(
     console.log(`[${correlationId}] Broadcasting Nostr events, registrar: ${registrarPubkey.substring(0, 12)}...`);
 
     try {
-      // KIND 87006 - Virgin Wallet Confirmation
-      const event87006 = createSignedEvent(
-        87006,
-        [
-          ["L", "lana-registry"],
-          ["l", "virgin-wallet-confirmation", "lana-registry"],
-          ["wallet", wallet_id],
-          ["balance", "0"],
-          ["verified_at", timestamp],
-          ["validation_method", "electrum"]
-        ],
-        `Wallet ${wallet_id} verified as virgin (balance: 0)`,
-        privateKeyHex
-      );
-      await broadcastToRelays(pool, sysParams.relays, event87006, correlationId);
+      const broadcastWork = async () => {
+        // KIND 87006 - Virgin Wallet Confirmation
+        const event87006 = createSignedEvent(
+          87006,
+          [
+            ["L", "lana-registry"],
+            ["l", "virgin-wallet-confirmation", "lana-registry"],
+            ["wallet", wallet_id],
+            ["balance", "0"],
+            ["verified_at", timestamp],
+            ["validation_method", "electrum"]
+          ],
+          `Wallet ${wallet_id} verified as virgin (balance: 0)`,
+          privateKeyHex
+        );
+        await broadcastToRelays(pool, sysParams.relays, event87006, correlationId);
 
-      // KIND 87002 - Registration Confirmation
-      const event87002 = createSignedEvent(
-        87002,
-        [
-          ["L", "lana-registry"],
-          ["l", "registration-confirmation", "lana-registry"],
-          ["wallet", wallet_id],
-          ["p", nostrHexForProfile],
-          ["status", "confirmed"],
-          ["wallet_type", resolvedWalletType],
-          ["registration_source", "api_check_wallet"],
-          ["is_virgin", "true"],
-          ["registered_at", timestamp]
-        ],
-        `Wallet ${wallet_id} registered via check_wallet API`,
-        privateKeyHex
-      );
-      await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
+        // KIND 87002 - Registration Confirmation
+        const event87002 = createSignedEvent(
+          87002,
+          [
+            ["L", "lana-registry"],
+            ["l", "registration-confirmation", "lana-registry"],
+            ["wallet", wallet_id],
+            ["p", nostrHexForProfile],
+            ["status", "confirmed"],
+            ["wallet_type", resolvedWalletType],
+            ["registration_source", "api_check_wallet"],
+            ["is_virgin", "true"],
+            ["registered_at", timestamp]
+          ],
+          `Wallet ${wallet_id} registered via check_wallet API`,
+          privateKeyHex
+        );
+        await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
 
-      // KIND 30889 - Wallet List (v1.1 with 7th field freeze_status)
-      const event30889 = createSignedEvent(
-        30889,
-        [
-          ["d", nostrHexForProfile],
-          ["status", "active"],
-          ["w", wallet_id, resolvedWalletType, "LANA", body.data?.notes || "", "0", ""]
-        ],
-        "",
-        privateKeyHex
-      );
-      await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
+        // KIND 30889 - Wallet List (v1.1 with 7th field freeze_status)
+        const event30889 = createSignedEvent(
+          30889,
+          [
+            ["d", nostrHexForProfile],
+            ["status", "active"],
+            ["w", wallet_id, resolvedWalletType, "LANA", body.data?.notes || "", "0", ""]
+          ],
+          "",
+          privateKeyHex
+        );
+        await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
+      };
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      pool.close(sysParams.relays);
+      const overallTimeout = new Promise<"timeout">(resolve =>
+        setTimeout(() => resolve("timeout"), 30000)
+      );
+      const result = await Promise.race([broadcastWork(), overallTimeout]);
+      if (result === "timeout") {
+        console.warn(`[${correlationId}] Overall Nostr broadcast timed out after 30s`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+      try { pool.close(sysParams.relays); } catch (_) {}
     } catch (error) {
       console.error(`[${correlationId}] Error in Nostr broadcasting:`, error);
     }
@@ -657,78 +679,88 @@ async function handleRegisterVirginWallets(
     const timestamp = new Date().toISOString();
 
     try {
-      for (const wallet of insertedWallets || []) {
-        const walletResult: WalletResult = {
-          wallet_id: wallet.wallet_id,
-          wallet_type: wallet.wallet_type,
-          nostr_broadcast: "success",
-          nostr_event_ids: {}
-        };
+      const broadcastWork = async () => {
+        for (const wallet of insertedWallets || []) {
+          const walletResult: WalletResult = {
+            wallet_id: wallet.wallet_id,
+            wallet_type: wallet.wallet_type,
+            nostr_broadcast: "success",
+            nostr_event_ids: {}
+          };
 
-        try {
-          const event87006 = createSignedEvent(87006, [
-            ["L", "lana-registry"],
-            ["l", "virgin-wallet-confirmation", "lana-registry"],
-            ["wallet", wallet.wallet_id],
-            ["balance", "0"],
-            ["verified_at", timestamp],
-            ["validation_method", "electrum"]
-          ], `Wallet ${wallet.wallet_id} verified as virgin (balance: 0)`, privateKeyHex);
+          try {
+            const event87006 = createSignedEvent(87006, [
+              ["L", "lana-registry"],
+              ["l", "virgin-wallet-confirmation", "lana-registry"],
+              ["wallet", wallet.wallet_id],
+              ["balance", "0"],
+              ["verified_at", timestamp],
+              ["validation_method", "electrum"]
+            ], `Wallet ${wallet.wallet_id} verified as virgin (balance: 0)`, privateKeyHex);
 
-          const result87006 = await broadcastToRelays(pool, sysParams.relays, event87006, correlationId);
-          if (result87006.success) walletResult.nostr_event_ids!.kind_87006 = result87006.eventId;
+            const result87006 = await broadcastToRelays(pool, sysParams.relays, event87006, correlationId);
+            if (result87006.success) walletResult.nostr_event_ids!.kind_87006 = result87006.eventId;
 
-          const event87002 = createSignedEvent(87002, [
-            ["L", "lana-registry"],
-            ["l", "registration-confirmation", "lana-registry"],
-            ["wallet", wallet.wallet_id],
-            ["p", nostr_id_hex],
-            ["status", "confirmed"],
-            ["wallet_type", wallet.wallet_type],
-            ["registration_source", "api_virgin_bulk"],
-            ["is_virgin", "true"],
-            ["registered_at", timestamp],
-            ["batch_id", correlationId]
-          ], `Wallet ${wallet.wallet_id} registered via bulk virgin registration`, privateKeyHex);
+            const event87002 = createSignedEvent(87002, [
+              ["L", "lana-registry"],
+              ["l", "registration-confirmation", "lana-registry"],
+              ["wallet", wallet.wallet_id],
+              ["p", nostr_id_hex],
+              ["status", "confirmed"],
+              ["wallet_type", wallet.wallet_type],
+              ["registration_source", "api_virgin_bulk"],
+              ["is_virgin", "true"],
+              ["registered_at", timestamp],
+              ["batch_id", correlationId]
+            ], `Wallet ${wallet.wallet_id} registered via bulk virgin registration`, privateKeyHex);
 
-          const result87002 = await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
-          if (result87002.success) {
-            walletResult.nostr_event_ids!.kind_87002 = result87002.eventId;
-            successfulBroadcasts++;
-          } else {
-            failedBroadcasts++;
+            const result87002 = await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
+            if (result87002.success) {
+              walletResult.nostr_event_ids!.kind_87002 = result87002.eventId;
+              successfulBroadcasts++;
+            } else {
+              failedBroadcasts++;
+              walletResult.nostr_broadcast = "failed";
+            }
+          } catch (error) {
+            console.error(`[${correlationId}] Error broadcasting for wallet ${wallet.wallet_id}:`, error);
             walletResult.nostr_broadcast = "failed";
+            failedBroadcasts++;
           }
-        } catch (error) {
-          console.error(`[${correlationId}] Error broadcasting for wallet ${wallet.wallet_id}:`, error);
-          walletResult.nostr_broadcast = "failed";
-          failedBroadcasts++;
+
+          results.push(walletResult);
         }
 
-        results.push(walletResult);
+        // KIND 30889 - Updated Wallet List (v1.1 with 7th field freeze_status)
+        const { data: allWallets } = await supabase
+          .from("wallets")
+          .select("wallet_id, wallet_type, notes, frozen")
+          .eq("main_wallet_id", mainWallet.id);
+
+        const walletTags = (allWallets || []).map((w: any) =>
+          ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0", w.frozen ? "frozen_l8w" : ""]
+        );
+
+        const event30889 = createSignedEvent(30889, [
+          ["d", nostr_id_hex],
+          ["status", "active"],
+          ...walletTags
+        ], "", privateKeyHex);
+
+        const result30889 = await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
+        console.log(`[${correlationId}] KIND 30889 broadcast result: ${result30889.acceptedRelays}/${sysParams.relays.length} relays accepted`);
+      };
+
+      const overallTimeout = new Promise<"timeout">(resolve =>
+        setTimeout(() => resolve("timeout"), 30000)
+      );
+      const raceResult = await Promise.race([broadcastWork(), overallTimeout]);
+      if (raceResult === "timeout") {
+        console.warn(`[${correlationId}] Overall Nostr broadcast timed out after 30s`);
       }
 
-      // KIND 30889 - Updated Wallet List (v1.1 with 7th field freeze_status)
-      const { data: allWallets } = await supabase
-        .from("wallets")
-        .select("wallet_id, wallet_type, notes, frozen")
-        .eq("main_wallet_id", mainWallet.id);
-
-      const walletTags = (allWallets || []).map((w: any) =>
-        ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0", w.frozen ? "frozen_l8w" : ""]
-      );
-
-      const event30889 = createSignedEvent(30889, [
-        ["d", nostr_id_hex],
-        ["status", "active"],
-        ...walletTags
-      ], "", privateKeyHex);
-
-      const result30889 = await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
-      console.log(`[${correlationId}] KIND 30889 broadcast result: ${result30889.acceptedRelays}/${sysParams.relays.length} relays accepted`);
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      pool.close(sysParams.relays);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      try { pool.close(sysParams.relays); } catch (_) {}
     } catch (error) {
       console.error(`[${correlationId}] Error in Nostr broadcasting:`, error);
     }
