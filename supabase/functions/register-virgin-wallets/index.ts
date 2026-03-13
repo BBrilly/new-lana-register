@@ -409,7 +409,8 @@ async function handleCheckWallet(
       wallet_id: wallet_id,
       wallet_type: resolvedWalletType,
       notes: body.data?.notes || null,
-      registration_source: "api_check_wallet"
+      registration_source: "api_check_wallet",
+      split_created: sysParams.currentSplit
     })
     .select()
     .single();
