@@ -130,6 +130,7 @@ Deno.serve(async (req) => {
             main_wallet_id: wallet.main_wallet_id,
             created_at: wallet.created_at,
             frozen: wallet.frozen ?? false,
+            split_created: wallet.split_created ?? null,
             nostr_hex_id: nostrHexId,
           },
           correlation_id: correlationId,
