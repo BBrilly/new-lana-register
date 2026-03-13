@@ -113,11 +113,11 @@ async function broadcastToRelays(
   }
 }
 
-// Helper: get system parameters (electrum + relays)
+// Helper: get system parameters (electrum + relays + split)
 async function getSystemParams(supabase: any, correlationId: string) {
   const { data: systemParams, error: paramsError } = await supabase
     .from("system_parameters")
-    .select("electrum, relays")
+    .select("electrum, relays, split")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -133,7 +133,9 @@ async function getSystemParams(supabase: any, correlationId: string) {
   }));
 
   const relays = (systemParams.relays as any[]).map((r: any) => r.url || r);
-  return { electrumServers, relays };
+  const currentSplit = parseInt(systemParams.split, 10) || null;
+  console.log(`[${correlationId}] Current split from system parameters: ${currentSplit}`);
+  return { electrumServers, relays, currentSplit };
 }
 
 // Helper: validate API key and update usage
