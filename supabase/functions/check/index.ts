@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     // Query wallets table
     const { data: wallet, error: walletError } = await supabase
       .from("wallets")
-      .select("wallet_id, wallet_type, main_wallet_id, created_at, frozen")
+      .select("wallet_id, wallet_type, main_wallet_id, created_at, frozen, split_created")
       .eq("wallet_id", walletId)
       .maybeSingle();
 
