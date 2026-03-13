@@ -883,7 +883,8 @@ async function handleRegisterWithRegisteredLanas(
       wallet_id: wallet_id,
       wallet_type: resolvedWalletType,
       notes: notes || null,
-      registration_source: "api_registered_lanas"
+      registration_source: "api_registered_lanas",
+      split_created: sysParams.currentSplit
     })
     .select()
     .single();
