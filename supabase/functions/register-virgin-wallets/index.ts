@@ -113,11 +113,11 @@ async function broadcastToRelays(
   }
 }
 
-// Helper: get system parameters (electrum + relays)
+// Helper: get system parameters (electrum + relays + split)
 async function getSystemParams(supabase: any, correlationId: string) {
   const { data: systemParams, error: paramsError } = await supabase
     .from("system_parameters")
-    .select("electrum, relays")
+    .select("electrum, relays, split")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -133,7 +133,9 @@ async function getSystemParams(supabase: any, correlationId: string) {
   }));
 
   const relays = (systemParams.relays as any[]).map((r: any) => r.url || r);
-  return { electrumServers, relays };
+  const currentSplit = parseInt(systemParams.split, 10) || null;
+  console.log(`[${correlationId}] Current split from system parameters: ${currentSplit}`);
+  return { electrumServers, relays, currentSplit };
 }
 
 // Helper: validate API key and update usage
@@ -407,7 +409,8 @@ async function handleCheckWallet(
       wallet_id: wallet_id,
       wallet_type: resolvedWalletType,
       notes: body.data?.notes || null,
-      registration_source: "api_check_wallet"
+      registration_source: "api_check_wallet",
+      split_created: sysParams.currentSplit
     })
     .select()
     .single();
@@ -645,7 +648,8 @@ async function handleRegisterVirginWallets(
     wallet_id: wallet.wallet_id,
     wallet_type: validTypes.has(wallet.wallet_type || "") ? wallet.wallet_type : "Main Wallet",
     notes: wallet.notes || null,
-    registration_source: "api_virgin_bulk"
+    registration_source: "api_virgin_bulk",
+    split_created: sysParams.currentSplit
   }));
 
   const { data: insertedWallets, error: insertError } = await supabase
@@ -879,7 +883,8 @@ async function handleRegisterWithRegisteredLanas(
       wallet_id: wallet_id,
       wallet_type: resolvedWalletType,
       notes: notes || null,
-      registration_source: "api_registered_lanas"
+      registration_source: "api_registered_lanas",
+      split_created: sysParams.currentSplit
     })
     .select()
     .single();
