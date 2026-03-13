@@ -1,21 +1,12 @@
 
 
-## Plan: Add `split_created` to simple_check_wallet_registration
+# Completed: Add KIND 30889 broadcast to auto-freeze in blockchain-monitor
 
-### Changes
+## What was done
+Updated `blockchain-monitor` to call the existing `freeze-wallets` edge function (via HTTP) instead of directly updating the `wallets` table. This ensures that when a wallet is auto-frozen due to receiving unregistered LANA above the threshold, a KIND 30889 event is also broadcast to Nostr relays.
 
-#### 1. Edge function `supabase/functions/check/index.ts`
-- Line 97: Add `split_created` to the `.select()` query: `"wallet_id, wallet_type, main_wallet_id, created_at, frozen, split_created"`
-- Line 132: Add `split_created: wallet.split_created ?? null` to the response wallet object
-
-No other logic changes — fully backward compatible (new field, no removed fields).
-
-#### 2. API docs `src/pages/ApiDocs.tsx`
-- Update `simpleCheckFound` example response (line ~162) to include `"split_created": 4`
-- Add `split_created` description bullet in the description list (~line 631): "Returns the split number in which the wallet was created"
-- Add `split_created` row to the response description if needed
-
-#### 3. Deploy the updated edge function
-
-No database changes needed.
-
+### Implementation
+- Wallets to freeze are collected in a `walletsToAutoFreeze` map during transaction processing
+- After all transactions in a block are processed, wallets are grouped by owner (`nostr_hex_id`)
+- For each owner group, `freeze-wallets` is called with `freeze_reason: 'frozen_unreg_Lanas'`
+- `freeze-wallets` handles both the DB update AND the KIND 30889 broadcast
