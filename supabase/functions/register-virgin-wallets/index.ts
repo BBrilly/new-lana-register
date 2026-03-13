@@ -648,7 +648,8 @@ async function handleRegisterVirginWallets(
     wallet_id: wallet.wallet_id,
     wallet_type: validTypes.has(wallet.wallet_type || "") ? wallet.wallet_type : "Main Wallet",
     notes: wallet.notes || null,
-    registration_source: "api_virgin_bulk"
+    registration_source: "api_virgin_bulk",
+    split_created: sysParams.currentSplit
   }));
 
   const { data: insertedWallets, error: insertError } = await supabase
