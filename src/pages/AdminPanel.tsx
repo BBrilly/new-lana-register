@@ -369,6 +369,10 @@ const AdminPanel = () => {
           <TabsContent value="frozen-accounts" className="space-y-4">
             <FrozenAccountsTab />
           </TabsContent>
+
+          <TabsContent value="max-cap" className="space-y-4">
+            <MaxCapFreezeManager />
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
