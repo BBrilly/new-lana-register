@@ -220,6 +220,10 @@ const AdminPanel = () => {
               <Lock className="h-4 w-4" />
               Frozen Accounts
             </TabsTrigger>
+            <TabsTrigger value="max-cap" className="flex items-center gap-1">
+              <BarChart3 className="h-4 w-4" />
+              Max Cap
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="events" className="space-y-4">
