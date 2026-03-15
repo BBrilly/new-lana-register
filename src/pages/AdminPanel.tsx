@@ -13,6 +13,7 @@ import StatCard from "@/components/StatCard";
 import ApiKeysManager from "@/components/ApiKeysManager";
 import FreezeManager from "@/components/FreezeManager";
 import FrozenAccountsTab from "@/components/FrozenAccountsTab";
+import MaxCapFreezeManager from "@/components/MaxCapFreezeManager";
 
 interface UnregisteredEvent {
   id: string;
