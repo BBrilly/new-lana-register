@@ -28,7 +28,7 @@ const MaxCapFreezeManager = () => {
   const handleAnalyze = async () => {
     const num = parseFloat(threshold);
     if (isNaN(num) || num <= 0) {
-      toast.error("Vnesi veljavno pozitivno število LANA");
+      toast.error("Enter a valid positive LANA amount");
       return;
     }
 
@@ -37,7 +37,7 @@ const MaxCapFreezeManager = () => {
     setAnalyzed(false);
 
     try {
-      // Fetch all unfrozen wallets of type 'main wallet' or 'wallet' with pagination
+      // Fetch all unfrozen wallets of type 'Main Wallet' or 'Wallet' with pagination
       const PAGE_SIZE = 1000;
       let allWallets: any[] = [];
       let offset = 0;
@@ -47,7 +47,7 @@ const MaxCapFreezeManager = () => {
         const { data: batch, error } = await supabase
           .from("wallets")
           .select("id, wallet_id, wallet_type, main_wallet_id")
-          .in("wallet_type", ["main wallet", "wallet"])
+          .in("wallet_type", ["Main Wallet", "Wallet"])
           .eq("frozen", false)
           .not("wallet_id", "is", null)
           .range(offset, offset + PAGE_SIZE - 1);
@@ -62,8 +62,10 @@ const MaxCapFreezeManager = () => {
         }
       }
 
+      console.log(`Max Cap: Found ${allWallets.length} unfrozen wallets of type Main Wallet / Wallet`);
+
       if (allWallets.length === 0) {
-        toast.info("Ni najdenih nezamrznjenih denarnic tipa 'main wallet' ali 'wallet'");
+        toast.info("No unfrozen wallets found of type 'Main Wallet' or 'Wallet'");
         setAnalyzed(true);
         setIsAnalyzing(false);
         return;
@@ -140,13 +142,13 @@ const MaxCapFreezeManager = () => {
       setAnalyzed(true);
 
       if (results.length === 0) {
-        toast.info(`Nobena denarnica nima stanja višjega od ${num} LANA`);
+        toast.info(`No wallets found with balance above ${num} LANA`);
       } else {
-        toast.success(`Najdenih ${results.length} denarnic s stanjem nad ${num} LANA`);
+        toast.success(`Found ${results.length} wallets with balance above ${num} LANA`);
       }
     } catch (err: any) {
       console.error("Analyze error:", err);
-      toast.error(err.message || "Napaka pri analizi");
+      toast.error(err.message || "Error during analysis");
     } finally {
       setIsAnalyzing(false);
     }
@@ -168,10 +170,10 @@ const MaxCapFreezeManager = () => {
 
       // Remove from list
       setCandidates(prev => prev.filter(c => c.id !== wallet.id));
-      toast.success(`Denarnica ${wallet.wallet_id.slice(0, 12)}... zamrznjena (frozen_max_cap)`);
+      toast.success(`Wallet ${wallet.wallet_id.slice(0, 12)}... frozen (frozen_max_cap)`);
     } catch (err: any) {
       console.error("Freeze error:", err);
-      toast.error(err.message || "Napaka pri zamrznitvi");
+      toast.error(err.message || "Error freezing wallet");
     } finally {
       setFreezingId(null);
     }
@@ -183,24 +185,24 @@ const MaxCapFreezeManager = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
-            Max Cap – Zamrzni po znesku
+            Max Cap – Freeze by Balance
           </CardTitle>
           <CardDescription>
-            Vnesi znesek LANA. Sistem bo poiskal vse nezamrznjene denarnice tipa "main wallet" in "wallet" s stanjem višjim od tega zneska. Zamrzneš jih lahko enega po enega.
+            Enter a LANA amount. The system will find all unfrozen wallets of type "Main Wallet" and "Wallet" with a balance above that threshold. You can freeze them one by one.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
             <Input
               type="number"
-              placeholder="Znesek LANA (npr. 1000)"
+              placeholder="LANA amount (e.g. 1000)"
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
             />
             <Button onClick={handleAnalyze} disabled={isAnalyzing} className="gap-2 shrink-0">
               {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              Analiziraj
+              Analyze
             </Button>
           </div>
         </CardContent>
@@ -218,24 +220,24 @@ const MaxCapFreezeManager = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Rezultati ({candidates.length} denarnic)
+              Results ({candidates.length} wallets)
             </CardTitle>
           </CardHeader>
           <CardContent>
             {candidates.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                Ni denarnic nad podanim zneskom
+                No wallets above the specified amount
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Lastnik</TableHead>
-                      <TableHead>Naslov denarnice</TableHead>
-                      <TableHead>Tip</TableHead>
-                      <TableHead className="text-right">Stanje (LANA)</TableHead>
-                      <TableHead className="text-center">Akcija</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Wallet Address</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Balance (LANA)</TableHead>
+                      <TableHead className="text-center">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -262,7 +264,7 @@ const MaxCapFreezeManager = () => {
                             ) : (
                               <Snowflake className="h-3 w-3" />
                             )}
-                            Zamrzni
+                            Freeze
                           </Button>
                         </TableCell>
                       </TableRow>
