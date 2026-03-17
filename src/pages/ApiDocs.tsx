@@ -150,6 +150,50 @@ const ApiDocs = () => {
     }
   }'`;
 
+  // ====== register_lanapays_wallet examples ======
+  const lanaPaysRequest = `{
+  "method": "register_lanapays_wallet",
+  "api_key": "YOUR_API_KEY",
+  "data": {
+    "wallet_id": "LWalletAddress123456789012345678",
+    "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+    "split": "current"
+  }
+}`;
+
+  const lanaPaysSuccess = `{
+  "success": true,
+  "wallet_id": "LWalletAddress123456789012345678",
+  "status": "ok",
+  "message": "LanaPays.us wallet registered successfully",
+  "data": {
+    "profileId": "550e8400-e29b-41d4-a716-446655440000",
+    "split_created": 4
+  },
+  "correlation_id": "uuid-string"
+}`;
+
+  const lanaPaysRejected = `{
+  "success": false,
+  "wallet_id": "LWalletAddress123456789012345678",
+  "status": "rejected",
+  "message": "Wallet is not virgin (balance: 15000). Only zero-balance wallets can be registered via this method.",
+  "correlation_id": "uuid-string"
+}`;
+
+  const lanaPaysCurl = `curl -X POST \\
+  'https://laluxmwarlejdwyboudz.supabase.co/functions/v1/register-virgin-wallets' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "method": "register_lanapays_wallet",
+    "api_key": "YOUR_API_KEY",
+    "data": {
+      "wallet_id": "LWalletAddress123456789012345678",
+      "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "split": "next"
+    }
+  }'`;
+
   // ====== simple_check_wallet_registration examples ======
   const simpleCheckRequest = `{
   "method": "simple_check_wallet_registration",
@@ -290,9 +334,9 @@ const ApiDocs = () => {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div>
-                <h3 className="font-semibold text-foreground mb-2">Single Endpoint — Two Methods</h3>
+                <h3 className="font-semibold text-foreground mb-2">Single Endpoint — Multiple Methods</h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Both operations below use the <strong>same endpoint</strong>. The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">method</code> field in the request body determines which operation is executed.
+                  All operations below use the <strong>same endpoint</strong>. The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">method</code> field in the request body determines which operation is executed.
                 </p>
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <Badge className="bg-success text-success-foreground">POST</Badge>
@@ -303,6 +347,7 @@ const ApiDocs = () => {
                 <div className="text-sm text-muted-foreground space-y-1">
                   <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "check_wallet"</code> — Check & auto-register a single wallet</p>
                   <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "register_virgin_wallets_for_existing_user"</code> — Bulk register wallets for existing profile</p>
+                  <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "register_lanapays_wallet"</code> — Register a LanaPays.us wallet with split control</p>
                 </div>
               </div>
             </div>
@@ -312,8 +357,9 @@ const ApiDocs = () => {
         {/* API Methods Tabs */}
         <Tabs defaultValue="check_wallet" className="mb-8">
           <TabsList className="mb-4 w-full sm:w-auto flex">
-            <TabsTrigger value="check_wallet" className="flex-1 sm:flex-none text-xs sm:text-sm">Method: check_wallet</TabsTrigger>
-            <TabsTrigger value="register_virgin" className="flex-1 sm:flex-none text-xs sm:text-sm">Method: register_virgin_wallets</TabsTrigger>
+            <TabsTrigger value="check_wallet" className="flex-1 sm:flex-none text-xs sm:text-sm">check_wallet</TabsTrigger>
+            <TabsTrigger value="register_virgin" className="flex-1 sm:flex-none text-xs sm:text-sm">register_virgin_wallets</TabsTrigger>
+            <TabsTrigger value="register_lanapays" className="flex-1 sm:flex-none text-xs sm:text-sm">register_lanapays_wallet</TabsTrigger>
           </TabsList>
 
           {/* ====== CHECK WALLET TAB ====== */}
@@ -574,6 +620,159 @@ const ApiDocs = () => {
                 <CodeBlock code={responseSuccess} sectionId="rv-success" label="Success Response (200)" />
                 <CodeBlock code={responseError} sectionId="rv-error" label="Error Response" />
                 <CodeBlock code={curlExample} sectionId="rv-curl" label="cURL Example" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ====== REGISTER LANAPAYS WALLET TAB ====== */}
+          <TabsContent value="register_lanapays">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileCode className="h-5 w-5 text-primary" />
+                  Register LanaPays.us Wallet
+                </CardTitle>
+                <CardDescription>
+                  Register a virgin wallet specifically as type "LanaPays.us" with split control (current or next).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Description */}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                  <p className="text-foreground">
+                    Registers a single virgin (zero-balance) wallet as type <strong>LanaPays.us</strong>. If the profile
+                    (identified by <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">nostr_id_hex</code>) doesn't exist, it will be created automatically.
+                  </p>
+                  <ul className="mt-3 space-y-2 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      Validates wallet is virgin (balance = 0) via Electrum
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split: "current"</code> — uses the current split number from KIND 38888
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split: "next"</code> — uses current split + 1 (e.g. if current is 4, writes 5)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      Broadcasts KIND 87006 (Virgin Confirmation), KIND 87002 (Registration), and KIND 30889 (Wallet List)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      Wallet type is always set to "LanaPays.us" — cannot be overridden
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Process Flow */}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">API Process Flow</h4>
+                  <div className="space-y-3">
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+                      <div>
+                        <p className="font-medium text-foreground">Validate Inputs</p>
+                        <p className="text-sm text-muted-foreground">Validates wallet_id, nostr_id_hex (required), and split parameter</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+                      <div>
+                        <p className="font-medium text-foreground">Duplicate Check</p>
+                        <p className="text-sm text-muted-foreground">Checks wallet doesn't already exist in wallets or main_wallets tables</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
+                      <div>
+                        <p className="font-medium text-foreground">Virgin Validation</p>
+                        <p className="text-sm text-muted-foreground">Verifies wallet balance is exactly 0 via Electrum servers</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
+                      <div>
+                        <p className="font-medium text-foreground">Registration</p>
+                        <p className="text-sm text-muted-foreground">Creates/finds profile, inserts wallet with computed split_created, broadcasts Nostr events</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Request Body */}
+                <CodeBlock code={lanaPaysRequest} sectionId="lp-request" label="Request Body" />
+
+                {/* Parameters */}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Parameters</h4>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Field</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Required</TableHead>
+                          <TableHead>Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">method</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">Must be "register_lanapays_wallet"</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">api_key</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">Your API authentication key</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.wallet_id</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">LANA wallet address (starts with 'L', 26-35 chars)</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.nostr_id_hex</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">64-character hex Nostr public key of the wallet owner</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.split</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">"current" (use active split) or "next" (current split + 1)</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Split Logic */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-foreground mb-2">Split Logic</h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split</code> parameter controls which split number is written to the <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split_created</code> field:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li><strong>"current"</strong> — Writes the current split number from KIND 38888 (e.g. if current split is 4, writes 4)</li>
+                    <li><strong>"next"</strong> — Writes current split + 1 (e.g. if current split is 4, writes 5)</li>
+                  </ul>
+                </div>
+
+                {/* Responses */}
+                <CodeBlock code={lanaPaysSuccess} sectionId="lp-success" label="Success Response (200)" />
+                <CodeBlock code={lanaPaysRejected} sectionId="lp-rejected" label="Rejection Response — Non-Virgin Wallet (200)" />
+
+                {/* cURL */}
+                <CodeBlock code={lanaPaysCurl} sectionId="lp-curl" label="cURL Example" />
               </CardContent>
             </Card>
           </TabsContent>

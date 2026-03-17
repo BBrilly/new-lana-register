@@ -967,6 +967,268 @@ async function handleRegisterWithRegisteredLanas(
   return { walletResult, successfulBroadcasts, failedBroadcasts, nostr_id_hex };
 }
 
+// ============================================
+// HANDLER: register_lanapays_wallet
+// ============================================
+async function handleRegisterLanaPaysWallet(
+  supabase: any,
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  body: any,
+  correlationId: string
+) {
+  const { wallet_id, nostr_id_hex, split } = body.data || {};
+
+  // Validate wallet_id
+  if (!wallet_id || !isValidLanaAddress(wallet_id)) {
+    return new Response(
+      JSON.stringify({
+        success: false, error: "invalid_wallet",
+        message: "Invalid wallet address format. Must start with 'L', minimum 26 chars, alphanumeric.",
+        correlation_id: correlationId
+      }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Validate nostr_id_hex (required)
+  if (!nostr_id_hex || !isValidNostrHex(nostr_id_hex)) {
+    return new Response(
+      JSON.stringify({
+        success: false, error: "invalid_nostr_id",
+        message: "nostr_id_hex is required and must be a 64-character hex string.",
+        correlation_id: correlationId
+      }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Validate split parameter (required, must be "current" or "next")
+  if (!split || (split !== "current" && split !== "next")) {
+    return new Response(
+      JSON.stringify({
+        success: false, error: "invalid_split",
+        message: 'split parameter is required and must be "current" or "next".',
+        correlation_id: correlationId
+      }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log(`[${correlationId}] register_lanapays_wallet: ${wallet_id}, nostr: ${nostr_id_hex.substring(0, 12)}..., split: ${split}`);
+
+  // Check for duplicate wallet
+  const { data: existingWallet } = await supabase
+    .from("wallets")
+    .select("wallet_id")
+    .eq("wallet_id", wallet_id)
+    .maybeSingle();
+
+  if (existingWallet) {
+    return new Response(
+      JSON.stringify({ success: false, status: "duplicate", error: "Wallet is already registered", correlation_id: correlationId }),
+      { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Also check main_wallets
+  const { data: existingMainWallet } = await supabase
+    .from("main_wallets")
+    .select("id, wallet_id")
+    .eq("wallet_id", wallet_id)
+    .maybeSingle();
+
+  if (existingMainWallet) {
+    return new Response(
+      JSON.stringify({ success: false, status: "duplicate", error: "Wallet is already registered as a main wallet", correlation_id: correlationId }),
+      { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Get system parameters
+  const sysParams = await getSystemParams(supabase, correlationId);
+  if (!sysParams) {
+    return new Response(
+      JSON.stringify({ success: false, error: "system_error", message: "System parameters not available", correlation_id: correlationId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Virgin check via Electrum
+  const balanceData = await checkWalletBalance(supabaseUrl, supabaseServiceKey, [wallet_id], sysParams.electrumServers, correlationId);
+  if (!balanceData) {
+    return new Response(
+      JSON.stringify({ success: false, error: "validation_error", message: "Failed to validate wallet balance", correlation_id: correlationId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const walletBalance = balanceData.wallets?.[0];
+  if (!walletBalance || walletBalance.balance !== 0) {
+    const balance = walletBalance?.balance ?? "unknown";
+    return new Response(
+      JSON.stringify({
+        success: false, wallet_id, status: "rejected",
+        message: `Wallet is not virgin (balance: ${balance}). Only zero-balance wallets can be registered via this method.`,
+        correlation_id: correlationId
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log(`[${correlationId}] Wallet ${wallet_id} verified as virgin`);
+
+  // Calculate split_created
+  const splitCreated = split === "next" ? (sysParams.currentSplit || 0) + 1 : sysParams.currentSplit;
+  console.log(`[${correlationId}] Split logic: param="${split}", currentSplit=${sysParams.currentSplit}, splitCreated=${splitCreated}`);
+
+  // Look up or create profile
+  let profileId: string;
+  let { data: mainWallet } = await supabase
+    .from("main_wallets")
+    .select("id, nostr_hex_id")
+    .eq("nostr_hex_id", nostr_id_hex)
+    .maybeSingle();
+
+  if (mainWallet) {
+    profileId = mainWallet.id;
+    console.log(`[${correlationId}] Found existing profile: ${profileId}`);
+  } else {
+    // Create new profile
+    const profileName = `Profile ${nostr_id_hex.substring(0, 8)}`;
+    const { data: newMainWallet, error: mainWalletError } = await supabase
+      .from("main_wallets")
+      .insert({
+        nostr_hex_id: nostr_id_hex,
+        name: profileName,
+        wallet_id: wallet_id,
+        is_owned: true,
+        status: "active"
+      })
+      .select()
+      .single();
+
+    if (mainWalletError) {
+      console.error(`[${correlationId}] Error creating main_wallet:`, mainWalletError);
+      return new Response(
+        JSON.stringify({ success: false, error: "database_error", message: "Failed to create wallet profile", correlation_id: correlationId }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    profileId = newMainWallet.id;
+    console.log(`[${correlationId}] Created new profile: ${profileId}`);
+  }
+
+  // Insert wallet with type "LanaPays.us"
+  const { data: insertedWallet, error: insertError } = await supabase
+    .from("wallets")
+    .insert({
+      main_wallet_id: profileId,
+      wallet_id: wallet_id,
+      wallet_type: "LanaPays.us",
+      registration_source: "api_lanapays",
+      split_created: splitCreated,
+      notes: null
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error(`[${correlationId}] Error inserting wallet:`, insertError);
+    return new Response(
+      JSON.stringify({ success: false, error: "database_error", message: "Failed to register wallet", correlation_id: correlationId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log(`[${correlationId}] Inserted LanaPays.us wallet: ${insertedWallet.id}, split_created: ${splitCreated}`);
+
+  // Nostr broadcasting
+  const nostrKey = await getNostrSigningKey(supabase, correlationId);
+  if (nostrKey) {
+    const pool = new SimplePool();
+    const { privateKeyHex, registrarPubkey } = nostrKey;
+    const timestamp = new Date().toISOString();
+
+    console.log(`[${correlationId}] Broadcasting Nostr events, registrar: ${registrarPubkey.substring(0, 12)}...`);
+
+    try {
+      const broadcastWork = async () => {
+        // KIND 87006 - Virgin Wallet Confirmation
+        const event87006 = createSignedEvent(87006, [
+          ["L", "lana-registry"],
+          ["l", "virgin-wallet-confirmation", "lana-registry"],
+          ["wallet", wallet_id],
+          ["balance", "0"],
+          ["verified_at", timestamp],
+          ["validation_method", "electrum"]
+        ], `Wallet ${wallet_id} verified as virgin (balance: 0)`, privateKeyHex);
+        await broadcastToRelays(pool, sysParams.relays, event87006, correlationId);
+
+        // KIND 87002 - Registration Confirmation
+        const event87002 = createSignedEvent(87002, [
+          ["L", "lana-registry"],
+          ["l", "registration-confirmation", "lana-registry"],
+          ["wallet", wallet_id],
+          ["p", nostr_id_hex],
+          ["status", "confirmed"],
+          ["wallet_type", "LanaPays.us"],
+          ["registration_source", "api_lanapays"],
+          ["is_virgin", "true"],
+          ["split_created", String(splitCreated)],
+          ["registered_at", timestamp]
+        ], `Wallet ${wallet_id} registered via register_lanapays_wallet API`, privateKeyHex);
+        await broadcastToRelays(pool, sysParams.relays, event87002, correlationId);
+
+        // KIND 30889 - Wallet List Update
+        const { data: allWallets } = await supabase
+          .from("wallets")
+          .select("wallet_id, wallet_type, notes, frozen")
+          .eq("main_wallet_id", profileId);
+
+        const walletTags = (allWallets || []).map((w: any) =>
+          ["w", w.wallet_id, w.wallet_type, "LANA", w.notes || "", "0", w.frozen ? "frozen_l8w" : ""]
+        );
+
+        const event30889 = createSignedEvent(30889, [
+          ["d", nostr_id_hex],
+          ["status", "active"],
+          ...walletTags
+        ], "", privateKeyHex);
+        await broadcastToRelays(pool, sysParams.relays, event30889, correlationId);
+      };
+
+      const overallTimeout = new Promise<"timeout">(resolve =>
+        setTimeout(() => resolve("timeout"), 30000)
+      );
+      const result = await Promise.race([broadcastWork(), overallTimeout]);
+      if (result === "timeout") {
+        console.warn(`[${correlationId}] Overall Nostr broadcast timed out after 30s`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+      try { pool.close(sysParams.relays); } catch (_) {}
+    } catch (error) {
+      console.error(`[${correlationId}] Error in Nostr broadcasting:`, error);
+    }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      wallet_id,
+      status: "ok",
+      message: "LanaPays.us wallet registered successfully",
+      data: {
+        profileId,
+        split_created: splitCreated
+      },
+      correlation_id: correlationId
+    }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
 // ========================
 // MAIN HANDLER
 // ========================
@@ -1043,12 +1305,14 @@ Deno.serve(async (req) => {
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    } else if (method === "register_lanapays_wallet") {
+      return await handleRegisterLanaPaysWallet(supabase, supabaseUrl, supabaseServiceKey, body, correlationId);
     } else {
       return new Response(
         JSON.stringify({
           success: false,
           status: "error",
-          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user, register_wallet_with_registered_lanas`,
+          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user, register_wallet_with_registered_lanas, register_lanapays_wallet`,
           correlation_id: correlationId
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
