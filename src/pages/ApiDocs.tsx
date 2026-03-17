@@ -623,6 +623,159 @@ const ApiDocs = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ====== REGISTER LANAPAYS WALLET TAB ====== */}
+          <TabsContent value="register_lanapays">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileCode className="h-5 w-5 text-primary" />
+                  Register LanaPays.us Wallet
+                </CardTitle>
+                <CardDescription>
+                  Register a virgin wallet specifically as type "LanaPays.us" with split control (current or next).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Description */}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                  <p className="text-foreground">
+                    Registers a single virgin (zero-balance) wallet as type <strong>LanaPays.us</strong>. If the profile
+                    (identified by <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">nostr_id_hex</code>) doesn't exist, it will be created automatically.
+                  </p>
+                  <ul className="mt-3 space-y-2 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      Validates wallet is virgin (balance = 0) via Electrum
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split: "current"</code> — uses the current split number from KIND 38888
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split: "next"</code> — uses current split + 1 (e.g. if current is 4, writes 5)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      Broadcasts KIND 87006 (Virgin Confirmation), KIND 87002 (Registration), and KIND 30889 (Wallet List)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      Wallet type is always set to "LanaPays.us" — cannot be overridden
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Process Flow */}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">API Process Flow</h4>
+                  <div className="space-y-3">
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+                      <div>
+                        <p className="font-medium text-foreground">Validate Inputs</p>
+                        <p className="text-sm text-muted-foreground">Validates wallet_id, nostr_id_hex (required), and split parameter</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+                      <div>
+                        <p className="font-medium text-foreground">Duplicate Check</p>
+                        <p className="text-sm text-muted-foreground">Checks wallet doesn't already exist in wallets or main_wallets tables</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
+                      <div>
+                        <p className="font-medium text-foreground">Virgin Validation</p>
+                        <p className="text-sm text-muted-foreground">Verifies wallet balance is exactly 0 via Electrum servers</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
+                      <div>
+                        <p className="font-medium text-foreground">Registration</p>
+                        <p className="text-sm text-muted-foreground">Creates/finds profile, inserts wallet with computed split_created, broadcasts Nostr events</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Request Body */}
+                <CodeBlock code={lanaPaysRequest} sectionId="lp-request" label="Request Body" />
+
+                {/* Parameters */}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Parameters</h4>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Field</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Required</TableHead>
+                          <TableHead>Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">method</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">Must be "register_lanapays_wallet"</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">api_key</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">Your API authentication key</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.wallet_id</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">LANA wallet address (starts with 'L', 26-35 chars)</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.nostr_id_hex</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">64-character hex Nostr public key of the wallet owner</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.split</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">"current" (use active split) or "next" (current split + 1)</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Split Logic */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-foreground mb-2">Split Logic</h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split</code> parameter controls which split number is written to the <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">split_created</code> field:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li><strong>"current"</strong> — Writes the current split number from KIND 38888 (e.g. if current split is 4, writes 4)</li>
+                    <li><strong>"next"</strong> — Writes current split + 1 (e.g. if current split is 4, writes 5)</li>
+                  </ul>
+                </div>
+
+                {/* Responses */}
+                <CodeBlock code={lanaPaysSuccess} sectionId="lp-success" label="Success Response (200)" />
+                <CodeBlock code={lanaPaysRejected} sectionId="lp-rejected" label="Rejection Response — Non-Virgin Wallet (200)" />
+
+                {/* cURL */}
+                <CodeBlock code={lanaPaysCurl} sectionId="lp-curl" label="cURL Example" />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* ========== ENDPOINT 2: CHECK ========== */}
