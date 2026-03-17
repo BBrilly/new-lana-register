@@ -157,7 +157,8 @@ const ApiDocs = () => {
   "data": {
     "wallet_id": "LWalletAddress123456789012345678",
     "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
-    "split": "current"
+    "split": "current",
+    "notes": "Store #42 downtown"
   }
 }`;
 
@@ -190,7 +191,8 @@ const ApiDocs = () => {
     "data": {
       "wallet_id": "LWalletAddress123456789012345678",
       "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
-      "split": "next"
+      "split": "next",
+      "notes": "POS terminal #7"
     }
   }'`;
 
@@ -749,6 +751,12 @@ const ApiDocs = () => {
                           <TableCell><Badge variant="outline">string</Badge></TableCell>
                           <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
                           <TableCell className="text-muted-foreground">"current" (use active split) or "next" (current split + 1)</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.notes</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Optional</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">Description or note for the wallet (max 500 chars)</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>

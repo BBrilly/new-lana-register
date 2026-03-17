@@ -977,7 +977,7 @@ async function handleRegisterLanaPaysWallet(
   body: any,
   correlationId: string
 ) {
-  const { wallet_id, nostr_id_hex, split } = body.data || {};
+  const { wallet_id, nostr_id_hex, split, notes } = body.data || {};
 
   // Validate wallet_id
   if (!wallet_id || !isValidLanaAddress(wallet_id)) {
@@ -1128,7 +1128,7 @@ async function handleRegisterLanaPaysWallet(
       wallet_type: "LanaPays.us",
       registration_source: "api_lanapays",
       split_created: splitCreated,
-      notes: null
+      notes: notes && typeof notes === "string" ? notes.trim().substring(0, 500) : null
     })
     .select()
     .single();
