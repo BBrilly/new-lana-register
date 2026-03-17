@@ -1128,7 +1128,7 @@ async function handleRegisterLanaPaysWallet(
       wallet_type: "LanaPays.us",
       registration_source: "api_lanapays",
       split_created: splitCreated,
-      notes: null
+      notes: notes && typeof notes === "string" ? notes.trim().substring(0, 500) : null
     })
     .select()
     .single();
