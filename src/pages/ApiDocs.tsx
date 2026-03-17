@@ -752,6 +752,12 @@ const ApiDocs = () => {
                           <TableCell><Badge className="bg-destructive/10 text-destructive border-destructive/20">Required</Badge></TableCell>
                           <TableCell className="text-muted-foreground">"current" (use active split) or "next" (current split + 1)</TableCell>
                         </TableRow>
+                        <TableRow>
+                          <TableCell className="font-mono text-sm">data.notes</TableCell>
+                          <TableCell><Badge variant="outline">string</Badge></TableCell>
+                          <TableCell><Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Optional</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">Description or note for the wallet (max 500 chars)</TableCell>
+                        </TableRow>
                       </TableBody>
                     </Table>
                   </div>
