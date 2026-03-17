@@ -157,7 +157,8 @@ const ApiDocs = () => {
   "data": {
     "wallet_id": "LWalletAddress123456789012345678",
     "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
-    "split": "current"
+    "split": "current",
+    "notes": "Store #42 downtown"
   }
 }`;
 
