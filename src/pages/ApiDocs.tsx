@@ -357,8 +357,9 @@ const ApiDocs = () => {
         {/* API Methods Tabs */}
         <Tabs defaultValue="check_wallet" className="mb-8">
           <TabsList className="mb-4 w-full sm:w-auto flex">
-            <TabsTrigger value="check_wallet" className="flex-1 sm:flex-none text-xs sm:text-sm">Method: check_wallet</TabsTrigger>
-            <TabsTrigger value="register_virgin" className="flex-1 sm:flex-none text-xs sm:text-sm">Method: register_virgin_wallets</TabsTrigger>
+            <TabsTrigger value="check_wallet" className="flex-1 sm:flex-none text-xs sm:text-sm">check_wallet</TabsTrigger>
+            <TabsTrigger value="register_virgin" className="flex-1 sm:flex-none text-xs sm:text-sm">register_virgin_wallets</TabsTrigger>
+            <TabsTrigger value="register_lanapays" className="flex-1 sm:flex-none text-xs sm:text-sm">register_lanapays_wallet</TabsTrigger>
           </TabsList>
 
           {/* ====== CHECK WALLET TAB ====== */}
