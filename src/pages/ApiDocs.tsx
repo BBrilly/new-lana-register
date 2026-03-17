@@ -150,6 +150,50 @@ const ApiDocs = () => {
     }
   }'`;
 
+  // ====== register_lanapays_wallet examples ======
+  const lanaPaysRequest = `{
+  "method": "register_lanapays_wallet",
+  "api_key": "YOUR_API_KEY",
+  "data": {
+    "wallet_id": "LWalletAddress123456789012345678",
+    "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+    "split": "current"
+  }
+}`;
+
+  const lanaPaysSuccess = `{
+  "success": true,
+  "wallet_id": "LWalletAddress123456789012345678",
+  "status": "ok",
+  "message": "LanaPays.us wallet registered successfully",
+  "data": {
+    "profileId": "550e8400-e29b-41d4-a716-446655440000",
+    "split_created": 4
+  },
+  "correlation_id": "uuid-string"
+}`;
+
+  const lanaPaysRejected = `{
+  "success": false,
+  "wallet_id": "LWalletAddress123456789012345678",
+  "status": "rejected",
+  "message": "Wallet is not virgin (balance: 15000). Only zero-balance wallets can be registered via this method.",
+  "correlation_id": "uuid-string"
+}`;
+
+  const lanaPaysCurl = `curl -X POST \\
+  'https://laluxmwarlejdwyboudz.supabase.co/functions/v1/register-virgin-wallets' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "method": "register_lanapays_wallet",
+    "api_key": "YOUR_API_KEY",
+    "data": {
+      "wallet_id": "LWalletAddress123456789012345678",
+      "nostr_id_hex": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "split": "next"
+    }
+  }'`;
+
   // ====== simple_check_wallet_registration examples ======
   const simpleCheckRequest = `{
   "method": "simple_check_wallet_registration",
