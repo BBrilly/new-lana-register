@@ -334,9 +334,9 @@ const ApiDocs = () => {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div>
-                <h3 className="font-semibold text-foreground mb-2">Single Endpoint — Two Methods</h3>
+                <h3 className="font-semibold text-foreground mb-2">Single Endpoint — Multiple Methods</h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Both operations below use the <strong>same endpoint</strong>. The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">method</code> field in the request body determines which operation is executed.
+                  All operations below use the <strong>same endpoint</strong>. The <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">method</code> field in the request body determines which operation is executed.
                 </p>
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <Badge className="bg-success text-success-foreground">POST</Badge>
@@ -347,6 +347,7 @@ const ApiDocs = () => {
                 <div className="text-sm text-muted-foreground space-y-1">
                   <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "check_wallet"</code> — Check & auto-register a single wallet</p>
                   <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "register_virgin_wallets_for_existing_user"</code> — Bulk register wallets for existing profile</p>
+                  <p><code className="px-1.5 py-0.5 rounded bg-muted text-foreground">"method": "register_lanapays_wallet"</code> — Register a LanaPays.us wallet with split control</p>
                 </div>
               </div>
             </div>
