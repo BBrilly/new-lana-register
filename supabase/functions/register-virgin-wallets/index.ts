@@ -1305,12 +1305,14 @@ Deno.serve(async (req) => {
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    } else if (method === "register_lanapays_wallet") {
+      return await handleRegisterLanaPaysWallet(supabase, supabaseUrl, supabaseServiceKey, body, correlationId);
     } else {
       return new Response(
         JSON.stringify({
           success: false,
           status: "error",
-          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user, register_wallet_with_registered_lanas`,
+          error: `Invalid method: ${method}. Supported: check_wallet, register_virgin_wallets_for_existing_user, register_wallet_with_registered_lanas, register_lanapays_wallet`,
           correlation_id: correlationId
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
