@@ -1218,7 +1218,7 @@ async function handleRegisterLanaPaysWallet(
       success: true,
       wallet_id,
       status: "ok",
-      message: "LanaPays.us wallet registered successfully",
+      message: "LanaPays.Us wallet registered successfully",
       data: {
         profileId,
         split_created: splitCreated
