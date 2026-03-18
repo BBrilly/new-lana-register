@@ -1172,7 +1172,7 @@ async function handleRegisterLanaPaysWallet(
           ["wallet", wallet_id],
           ["p", nostr_id_hex],
           ["status", "confirmed"],
-          ["wallet_type", "LanaPays.us"],
+          ["wallet_type", "LanaPays.Us"],
           ["registration_source", "api_lanapays"],
           ["is_virgin", "true"],
           ["split_created", String(splitCreated)],
