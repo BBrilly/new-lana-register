@@ -1119,7 +1119,7 @@ async function handleRegisterLanaPaysWallet(
     console.log(`[${correlationId}] Created new profile: ${profileId}`);
   }
 
-  // Insert wallet with type "LanaPays.us"
+  // Insert wallet with type "LanaPays.Us"
   const { data: insertedWallet, error: insertError } = await supabase
     .from("wallets")
     .insert({
