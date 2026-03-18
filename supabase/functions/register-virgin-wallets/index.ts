@@ -1141,7 +1141,7 @@ async function handleRegisterLanaPaysWallet(
     );
   }
 
-  console.log(`[${correlationId}] Inserted LanaPays.us wallet: ${insertedWallet.id}, split_created: ${splitCreated}`);
+  console.log(`[${correlationId}] Inserted LanaPays.Us wallet: ${insertedWallet.id}, split_created: ${splitCreated}`);
 
   // Nostr broadcasting
   const nostrKey = await getNostrSigningKey(supabase, correlationId);
