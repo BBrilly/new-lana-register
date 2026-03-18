@@ -1125,7 +1125,7 @@ async function handleRegisterLanaPaysWallet(
     .insert({
       main_wallet_id: profileId,
       wallet_id: wallet_id,
-      wallet_type: "LanaPays.us",
+      wallet_type: "LanaPays.Us",
       registration_source: "api_lanapays",
       split_created: splitCreated,
       notes: notes && typeof notes === "string" ? notes.trim().substring(0, 500) : null
