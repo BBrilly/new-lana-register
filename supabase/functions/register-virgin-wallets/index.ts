@@ -1119,13 +1119,13 @@ async function handleRegisterLanaPaysWallet(
     console.log(`[${correlationId}] Created new profile: ${profileId}`);
   }
 
-  // Insert wallet with type "LanaPays.us"
+  // Insert wallet with type "LanaPays.Us"
   const { data: insertedWallet, error: insertError } = await supabase
     .from("wallets")
     .insert({
       main_wallet_id: profileId,
       wallet_id: wallet_id,
-      wallet_type: "LanaPays.us",
+      wallet_type: "LanaPays.Us",
       registration_source: "api_lanapays",
       split_created: splitCreated,
       notes: notes && typeof notes === "string" ? notes.trim().substring(0, 500) : null
@@ -1141,7 +1141,7 @@ async function handleRegisterLanaPaysWallet(
     );
   }
 
-  console.log(`[${correlationId}] Inserted LanaPays.us wallet: ${insertedWallet.id}, split_created: ${splitCreated}`);
+  console.log(`[${correlationId}] Inserted LanaPays.Us wallet: ${insertedWallet.id}, split_created: ${splitCreated}`);
 
   // Nostr broadcasting
   const nostrKey = await getNostrSigningKey(supabase, correlationId);
@@ -1172,7 +1172,7 @@ async function handleRegisterLanaPaysWallet(
           ["wallet", wallet_id],
           ["p", nostr_id_hex],
           ["status", "confirmed"],
-          ["wallet_type", "LanaPays.us"],
+          ["wallet_type", "LanaPays.Us"],
           ["registration_source", "api_lanapays"],
           ["is_virgin", "true"],
           ["split_created", String(splitCreated)],
@@ -1218,7 +1218,7 @@ async function handleRegisterLanaPaysWallet(
       success: true,
       wallet_id,
       status: "ok",
-      message: "LanaPays.us wallet registered successfully",
+      message: "LanaPays.Us wallet registered successfully",
       data: {
         profileId,
         split_created: splitCreated
