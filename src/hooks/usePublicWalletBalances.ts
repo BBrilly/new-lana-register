@@ -110,6 +110,8 @@ export const usePublicWalletBalances = (walletTypes: string[]) => {
           display_name: (wallet.main_wallet as any)?.display_name || null,
           balance: balanceMap.get(wallet.wallet_id || '') || 0,
           split_created: wallet.split_created ?? null,
+          frozen: wallet.frozen ?? false,
+          freeze_reason: wallet.freeze_reason || undefined,
         })));
       } catch (err) {
         console.error('Error loading wallets:', err);
