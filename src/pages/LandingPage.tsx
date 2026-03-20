@@ -373,7 +373,7 @@ const LandingPage = () => {
         // Fetch system parameters for Electrum servers
         const { data: sysParams } = await supabase
           .from('system_parameters')
-          .select('electrum')
+          .select('electrum, fx')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
