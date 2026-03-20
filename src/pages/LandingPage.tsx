@@ -1727,6 +1727,7 @@ const LandingPage = () => {
                     </TableBody>
                   </Table>
                 </div>
+                </>
               )}
             </TabsContent>
 
