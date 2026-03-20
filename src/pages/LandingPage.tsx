@@ -89,6 +89,17 @@ const LandingPage = () => {
   const [sortField, setSortField] = useState<'name' | 'balance' | 'wallet_type'>('balance');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [fxRatesWallets, setFxRatesWallets] = useState<{ EUR: number; GBP: number; USD: number } | null>(null);
+
+  // Calculate 50 EUR/GBP/USD limit in LANA
+  const lanaLimits = useMemo(() => {
+    if (!fxRatesWallets) return null;
+    return {
+      EUR: fxRatesWallets.EUR > 0 ? 50 / fxRatesWallets.EUR : Infinity,
+      GBP: fxRatesWallets.GBP > 0 ? 50 / fxRatesWallets.GBP : Infinity,
+      USD: fxRatesWallets.USD > 0 ? 50 / fxRatesWallets.USD : Infinity,
+    };
+  }, [fxRatesWallets]);
 
   useEffect(() => {
     const loadSystemParameters = async () => {
