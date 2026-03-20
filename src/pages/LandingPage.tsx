@@ -34,6 +34,7 @@ interface WalletWithBalance {
   balance: number;
   freeze_reason?: string;
   split_created?: number | null;
+  frozen?: boolean;
 }
 
 const FREEZE_LABELS: Record<string, string> = {
@@ -88,6 +89,17 @@ const LandingPage = () => {
   const [sortField, setSortField] = useState<'name' | 'balance' | 'wallet_type'>('balance');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [fxRatesWallets, setFxRatesWallets] = useState<{ EUR: number; GBP: number; USD: number } | null>(null);
+
+  // Calculate 50 EUR/GBP/USD limit in LANA
+  const lanaLimits = useMemo(() => {
+    if (!fxRatesWallets) return null;
+    return {
+      EUR: fxRatesWallets.EUR > 0 ? 50 / fxRatesWallets.EUR : Infinity,
+      GBP: fxRatesWallets.GBP > 0 ? 50 / fxRatesWallets.GBP : Infinity,
+      USD: fxRatesWallets.USD > 0 ? 50 / fxRatesWallets.USD : Infinity,
+    };
+  }, [fxRatesWallets]);
 
   useEffect(() => {
     const loadSystemParameters = async () => {
@@ -321,6 +333,8 @@ const LandingPage = () => {
                 wallet_id,
                 wallet_type,
                 split_created,
+                frozen,
+                freeze_reason,
                 main_wallet:main_wallets(name, display_name)
               `)
               .in('wallet_type', ['Wallet', 'Main Wallet', 'Knights', 'Lana8Wonder', 'LanaPays.Us', 'Lana.Discount'])
@@ -370,7 +384,7 @@ const LandingPage = () => {
         // Fetch system parameters for Electrum servers
         const { data: sysParams } = await supabase
           .from('system_parameters')
-          .select('electrum')
+          .select('electrum, fx')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -408,6 +422,14 @@ const LandingPage = () => {
           });
         }
 
+        // Parse FX rates for limit calculation
+        const fx = (sysParams as any).fx || {};
+        setFxRatesWallets({
+          EUR: fx.EUR || 0,
+          GBP: fx.GBP || 0,
+          USD: fx.USD || 0,
+        });
+
         // Map wallets with balances
         const walletsWithBalances: WalletWithBalance[] = wallets.map(wallet => ({
           id: wallet.id,
@@ -417,6 +439,8 @@ const LandingPage = () => {
           display_name: (wallet.main_wallet as any)?.display_name || null,
           balance: balanceMap.get(wallet.wallet_id || '') || 0,
           split_created: (wallet as any).split_created ?? null,
+          frozen: (wallet as any).frozen ?? false,
+          freeze_reason: (wallet as any).freeze_reason || undefined,
         }));
 
         setWalletBalances(walletsWithBalances);
@@ -1575,8 +1599,30 @@ const LandingPage = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
+                <>
+              {/* FX Limit Info */}
+              {lanaLimits && fxRatesWallets && (
+                <div className="mb-4 p-3 rounded-lg border bg-muted/30 flex flex-wrap gap-4 items-center text-sm">
+                  <span className="font-medium text-muted-foreground">50 unit limit in LANA:</span>
+                  <Badge variant="outline" className="gap-1">
+                    EUR: {lanaLimits.EUR.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    GBP: {lanaLimits.GBP.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    USD: {lanaLimits.USD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
+                  </Badge>
+                  <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                    <Snowflake className="h-3 w-3 text-sky-500" /> Frozen
+                    <span className="mx-1">|</span>
+                    <AlertTriangle className="h-3 w-3 text-sky-400" /> Over limit
+                  </span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>#</TableHead>
@@ -1624,12 +1670,22 @@ const LandingPage = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        sortedAllWallets.map((wallet, index) => (
-                          <TableRow key={wallet.id}>
-                            <TableCell className="font-medium">{index + 1}</TableCell>
+                        sortedAllWallets.map((wallet, index) => {
+                          const lanaLimit = lanaLimits?.EUR ?? null;
+                          const overLimit = lanaLimit !== null && wallet.balance > lanaLimit && !wallet.frozen;
+                          const isFrozen = wallet.frozen === true;
+                          return (
+                          <TableRow key={wallet.id} className={cn(
+                            isFrozen && "bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/30 dark:hover:bg-sky-950/50",
+                            overLimit && !isFrozen && "bg-sky-50/60 hover:bg-sky-100/60 dark:bg-sky-900/20 dark:hover:bg-sky-900/30"
+                          )}>
+                            <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                             <TableCell>
-                              <div className="font-medium">
-                                {wallet.display_name || wallet.name || '-'}
+                              <div className="flex items-center gap-1.5">
+                                {isFrozen && <Snowflake className="h-3.5 w-3.5 text-sky-500 shrink-0" />}
+                                <span className={cn("font-medium", overLimit && "text-sky-600 dark:text-sky-400 font-semibold")}>
+                                  {wallet.display_name || wallet.name || '-'}
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1660,15 +1716,18 @@ const LandingPage = () => {
                                 <span className="text-muted-foreground">-</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-right font-semibold">
+                            <TableCell className={cn("text-right font-semibold", overLimit && "text-sky-600 dark:text-sky-400")}>
+                              {overLimit && <AlertTriangle className="h-3 w-3 inline mr-1" />}
                               {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                             </TableCell>
                           </TableRow>
-                        ))
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
                 </div>
+                </>
               )}
             </TabsContent>
 

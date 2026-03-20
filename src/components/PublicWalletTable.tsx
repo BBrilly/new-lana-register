@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUp, ArrowDown, ArrowUpDown, Check, Copy, AlertTriangle } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowUpDown, Check, Copy, AlertTriangle, Snowflake } from "lucide-react";
 import { WalletWithBalance, FxLimits } from "@/hooks/usePublicWalletBalances";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +32,6 @@ const PublicWalletTable = ({
     return sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
-  // Use EUR limit as the threshold (most common)
   const lanaLimit = lanaLimits?.EUR ?? null;
   const isOverLimit = (balance: number) => lanaLimit !== null && balance > lanaLimit;
 
@@ -65,8 +64,9 @@ const PublicWalletTable = ({
             USD: {lanaLimits.USD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
           </Badge>
           <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 text-destructive" />
-            Red = over 50 EUR limit
+            <Snowflake className="h-3 w-3 text-sky-500" /> Frozen
+            <span className="mx-1">|</span>
+            <AlertTriangle className="h-3 w-3 text-sky-400" /> Over limit
           </span>
         </div>
       )}
@@ -111,14 +111,21 @@ const PublicWalletTable = ({
                 </TableRow>
               ) : (
                 wallets.map((wallet, index) => {
-                  const overLimit = isOverLimit(wallet.balance);
+                  const overLimit = isOverLimit(wallet.balance) && !wallet.frozen;
+                  const isFrozen = wallet.frozen === true;
                   return (
-                    <TableRow key={wallet.id} className={cn(overLimit && "bg-destructive/10 hover:bg-destructive/15")}>
-                      <TableCell className={cn("font-medium text-muted-foreground", overLimit && "text-destructive")}>{index + 1}</TableCell>
+                    <TableRow key={wallet.id} className={cn(
+                      isFrozen && "bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/30 dark:hover:bg-sky-950/50",
+                      overLimit && !isFrozen && "bg-sky-50/60 hover:bg-sky-100/60 dark:bg-sky-900/20 dark:hover:bg-sky-900/30"
+                    )}>
+                      <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                       <TableCell>
-                        <span className={cn("font-medium", overLimit && "text-destructive font-semibold")}>
-                          {wallet.display_name || wallet.name || '-'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isFrozen && <Snowflake className="h-3.5 w-3.5 text-sky-500 shrink-0" />}
+                          <span className={cn("font-medium", overLimit && "text-sky-600 dark:text-sky-400 font-semibold")}>
+                            {wallet.display_name || wallet.name || '-'}
+                          </span>
+                        </div>
                       </TableCell>
                       {showWalletType && (
                         <TableCell>
@@ -146,7 +153,7 @@ const PublicWalletTable = ({
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className={cn("text-right font-semibold", overLimit && "text-destructive")}>
+                      <TableCell className={cn("text-right font-semibold", overLimit && "text-sky-600 dark:text-sky-400")}>
                         {overLimit && <AlertTriangle className="h-3 w-3 inline mr-1" />}
                         {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })} LANA
                       </TableCell>
