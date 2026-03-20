@@ -411,6 +411,14 @@ const LandingPage = () => {
           });
         }
 
+        // Parse FX rates for limit calculation
+        const fx = (sysParams as any).fx || {};
+        setFxRatesWallets({
+          EUR: fx.EUR || 0,
+          GBP: fx.GBP || 0,
+          USD: fx.USD || 0,
+        });
+
         // Map wallets with balances
         const walletsWithBalances: WalletWithBalance[] = wallets.map(wallet => ({
           id: wallet.id,
@@ -420,6 +428,8 @@ const LandingPage = () => {
           display_name: (wallet.main_wallet as any)?.display_name || null,
           balance: balanceMap.get(wallet.wallet_id || '') || 0,
           split_created: (wallet as any).split_created ?? null,
+          frozen: (wallet as any).frozen ?? false,
+          freeze_reason: (wallet as any).freeze_reason || undefined,
         }));
 
         setWalletBalances(walletsWithBalances);
