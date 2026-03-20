@@ -10,6 +10,8 @@ export interface WalletWithBalance {
   display_name: string | null;
   balance: number;
   split_created: number | null;
+  frozen?: boolean;
+  freeze_reason?: string;
 }
 
 export interface FxLimits {
