@@ -1599,8 +1599,29 @@ const LandingPage = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
+              {/* FX Limit Info */}
+              {lanaLimits && fxRatesWallets && (
+                <div className="mb-4 p-3 rounded-lg border bg-muted/30 flex flex-wrap gap-4 items-center text-sm">
+                  <span className="font-medium text-muted-foreground">50 unit limit in LANA:</span>
+                  <Badge variant="outline" className="gap-1">
+                    EUR: {lanaLimits.EUR.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    GBP: {lanaLimits.GBP.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    USD: {lanaLimits.USD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LANA
+                  </Badge>
+                  <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                    <Snowflake className="h-3 w-3 text-sky-500" /> Frozen
+                    <span className="mx-1">|</span>
+                    <AlertTriangle className="h-3 w-3 text-sky-400" /> Over limit
+                  </span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>#</TableHead>
