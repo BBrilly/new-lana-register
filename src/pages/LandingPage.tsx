@@ -1599,6 +1599,7 @@ const LandingPage = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
+                <>
               {/* FX Limit Info */}
               {lanaLimits && fxRatesWallets && (
                 <div className="mb-4 p-3 rounded-lg border bg-muted/30 flex flex-wrap gap-4 items-center text-sm">
