@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, RefreshCw, Wallet, TrendingUp, Key, Snowflake, Lock, BarChart3 } from "lucide-react";
+import { Shield, RefreshCw, Wallet, TrendingUp, Key, Snowflake, Lock, BarChart3, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import ApiKeysManager from "@/components/ApiKeysManager";
 import FreezeManager from "@/components/FreezeManager";
 import FrozenAccountsTab from "@/components/FrozenAccountsTab";
 import MaxCapFreezeManager from "@/components/MaxCapFreezeManager";
+import AdminRegisterWallet from "@/components/AdminRegisterWallet";
 
 interface UnregisteredEvent {
   id: string;
@@ -224,6 +225,10 @@ const AdminPanel = () => {
               <BarChart3 className="h-4 w-4" />
               Max Cap
             </TabsTrigger>
+            <TabsTrigger value="register-wallet" className="flex items-center gap-1">
+              <UserPlus className="h-4 w-4" />
+              Register Wallet
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="events" className="space-y-4">
@@ -372,6 +377,10 @@ const AdminPanel = () => {
 
           <TabsContent value="max-cap" className="space-y-4">
             <MaxCapFreezeManager />
+          </TabsContent>
+
+          <TabsContent value="register-wallet" className="space-y-4">
+            <AdminRegisterWallet />
           </TabsContent>
         </Tabs>
       </div>
