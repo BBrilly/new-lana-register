@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_registration_overrides: {
+        Row: {
+          approved_by: string | null
+          approved_by_nostr_hex: string | null
+          created_at: string
+          id: string
+          justification: string
+          unregistered_senders: string[] | null
+          wallet_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_by_nostr_hex?: string | null
+          created_at?: string
+          id?: string
+          justification: string
+          unregistered_senders?: string[] | null
+          wallet_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_by_nostr_hex?: string | null
+          created_at?: string
+          id?: string
+          justification?: string
+          unregistered_senders?: string[] | null
+          wallet_id?: string
+        }
+        Relationships: []
+      }
       admin_users: {
         Row: {
           created_at: string
