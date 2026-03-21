@@ -378,6 +378,10 @@ const AdminPanel = () => {
           <TabsContent value="max-cap" className="space-y-4">
             <MaxCapFreezeManager />
           </TabsContent>
+
+          <TabsContent value="register-wallet" className="space-y-4">
+            <AdminRegisterWallet />
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
