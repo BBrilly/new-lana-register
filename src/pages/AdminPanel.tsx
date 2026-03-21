@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, RefreshCw, Wallet, TrendingUp, Key, Snowflake, Lock, BarChart3 } from "lucide-react";
+import { Shield, RefreshCw, Wallet, TrendingUp, Key, Snowflake, Lock, BarChart3, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import ApiKeysManager from "@/components/ApiKeysManager";
 import FreezeManager from "@/components/FreezeManager";
 import FrozenAccountsTab from "@/components/FrozenAccountsTab";
 import MaxCapFreezeManager from "@/components/MaxCapFreezeManager";
+import AdminRegisterWallet from "@/components/AdminRegisterWallet";
 
 interface UnregisteredEvent {
   id: string;
