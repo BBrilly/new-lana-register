@@ -225,6 +225,10 @@ const AdminPanel = () => {
               <BarChart3 className="h-4 w-4" />
               Max Cap
             </TabsTrigger>
+            <TabsTrigger value="register-wallet" className="flex items-center gap-1">
+              <UserPlus className="h-4 w-4" />
+              Register Wallet
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="events" className="space-y-4">
