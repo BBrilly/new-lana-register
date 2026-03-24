@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
                       }
 
                       // Auto-freeze: if unregistered LANA amount exceeds threshold
-                      if (autoFreezeThreshold !== null && receiver.amount >= autoFreezeThreshold) {
+                      if (autoFreezeThreshold !== null && receiver.amount >= autoFreezeThreshold && receiverWallet?.wallet_type !== 'Knights') {
                         const recvWallet = walletMap.get(receiver.address);
                         if (recvWallet) {
                           walletsToAutoFreeze.set(recvWallet.id, {
