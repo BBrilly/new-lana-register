@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import CodeBlock from "@/components/api-docs/CodeBlock";
+import KeyDerivationDocs from "@/components/api-docs/KeyDerivationDocs";
 
 const ApiDocs = () => {
   const navigate = useNavigate();
