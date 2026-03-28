@@ -74,7 +74,10 @@ const WalletConsolidate = () => {
       setIsValidatingKey(true);
       try {
         const derived = await convertWifToIds(privateKey);
-        const isValid = derived.walletId === walletAddress;
+        // Check if EITHER derived address matches the wallet (supports both WIF formats)
+        const matchesCompressed = derived.compressedAddress === walletAddress;
+        const matchesUncompressed = derived.uncompressedAddress === walletAddress;
+        const isValid = matchesCompressed || matchesUncompressed;
         setIsKeyValid(isValid);
         
         if (!isValid) {

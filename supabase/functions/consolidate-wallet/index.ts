@@ -181,7 +181,7 @@ class Point {
   }
 }
 
-function privateKeyToPublicKey(privateKeyHex: string): Uint8Array {
+function privateKeyToUncompressedPublicKey(privateKeyHex: string): Uint8Array {
   const privateKeyBigInt = BigInt('0x' + privateKeyHex);
   const publicKeyPoint = Point.G.multiply(privateKeyBigInt);
   const x = publicKeyPoint.x.toString(16).padStart(64, '0');
@@ -191,6 +191,43 @@ function privateKeyToPublicKey(privateKeyHex: string): Uint8Array {
   result.set(hexToUint8Array(x), 1);
   result.set(hexToUint8Array(y), 33);
   return result;
+}
+
+function privateKeyToCompressedPublicKey(privateKeyHex: string): Uint8Array {
+  const privateKeyBigInt = BigInt('0x' + privateKeyHex);
+  const publicKeyPoint = Point.G.multiply(privateKeyBigInt);
+  const x = publicKeyPoint.x.toString(16).padStart(64, '0');
+  const prefix = publicKeyPoint.y % 2n === 0n ? 0x02 : 0x03;
+  const result = new Uint8Array(33);
+  result[0] = prefix;
+  result.set(hexToUint8Array(x), 1);
+  return result;
+}
+
+// Backward-compatible alias
+function privateKeyToPublicKey(privateKeyHex: string): Uint8Array {
+  return privateKeyToUncompressedPublicKey(privateKeyHex);
+}
+
+// Decode WIF and detect compression format
+function decodeWifKey(wifStr: string): { privateKeyHex: string; isCompressed: boolean } {
+  const normalized = wifStr.replace(/[\s\u200B-\u200D\uFEFF\r\n\t]/g, '').trim();
+  const decoded = base58Decode(normalized);
+  const payload = decoded.slice(0, -4);
+  
+  // Verify prefix — accept BOTH formats
+  // 0xb0 (176) = old uncompressed (starts with '6')
+  // 0x41 (65) = new compressed (starts with 'T')
+  if (payload[0] !== 0xb0 && payload[0] !== 0x41) {
+    throw new Error(`Invalid WIF prefix: 0x${payload[0].toString(16)}. Expected 0xb0 or 0x41`);
+  }
+  
+  // 33 bytes = version(1) + key(32) → uncompressed
+  // 34 bytes = version(1) + key(32) + flag(1) → compressed
+  const isCompressed = payload.length === 34 && payload[33] === 0x01;
+  const privateKeyHex = uint8ArrayToHex(payload.slice(1, 33));
+  
+  return { privateKeyHex, isCompressed };
 }
 
 async function publicKeyToAddress(publicKey: Uint8Array): Promise<string> {
@@ -374,9 +411,13 @@ async function buildSignedTx(
     console.log(`💰 Total input value: ${totalValue} lanoshis (${(totalValue / 100000000).toFixed(8)} LANA)`);
     console.log(`💸 Transaction: Amount=${totalAmount}, Fee=${fee}, Change=${totalValue - totalAmount - fee}`);
     
-    const privateKeyBytes = base58CheckDecode(privateKeyWIF);
-    const privateKeyHex = uint8ArrayToHex(privateKeyBytes.slice(1));
-    const publicKey = privateKeyToPublicKey(privateKeyHex);
+    // Decode WIF and detect compression to use correct public key type
+    const { privateKeyHex, isCompressed } = decodeWifKey(privateKeyWIF);
+    const publicKey = isCompressed 
+      ? privateKeyToCompressedPublicKey(privateKeyHex)
+      : privateKeyToUncompressedPublicKey(privateKeyHex);
+    
+    console.log(`🔑 Using ${isCompressed ? 'compressed (33-byte)' : 'uncompressed (65-byte)'} public key`);
     
     // Build recipient output
     const outputs = [];
@@ -554,17 +595,22 @@ serve(async (req) => {
       throw new Error('Missing required parameters');
     }
     
-    // Validate private key
-    const privateKeyBytes = base58CheckDecode(private_key);
-    const privateKeyHex = uint8ArrayToHex(privateKeyBytes.slice(1));
-    const generatedPubKey = privateKeyToPublicKey(privateKeyHex);
-    const expectedAddress = await publicKeyToAddress(generatedPubKey);
+    // Validate private key matches sender address (supports both WIF formats)
+    const { privateKeyHex, isCompressed } = decodeWifKey(private_key);
     
-    if (expectedAddress !== sender_address) {
-      throw new Error('Private key does not match sender address');
+    // Generate both address types and check which one matches
+    const uncompressedPubKey = privateKeyToUncompressedPublicKey(privateKeyHex);
+    const compressedPubKey = privateKeyToCompressedPublicKey(privateKeyHex);
+    const uncompressedAddress = await publicKeyToAddress(uncompressedPubKey);
+    const compressedAddress = await publicKeyToAddress(compressedPubKey);
+    
+    const matchesCompressed = compressedAddress === sender_address;
+    const matchesUncompressed = uncompressedAddress === sender_address;
+    
+    if (!matchesCompressed && !matchesUncompressed) {
+      throw new Error(`Private key does not match sender address. Expected: ${sender_address}, got compressed: ${compressedAddress}, uncompressed: ${uncompressedAddress}`);
     }
-    
-    console.log('✅ Private key validated');
+    console.log(`✅ Private key validated (${matchesCompressed ? 'compressed' : 'uncompressed'} key match)`);
     
     const servers = electrum_servers && electrum_servers.length > 0
       ? electrum_servers
