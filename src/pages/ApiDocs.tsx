@@ -303,6 +303,16 @@ const ApiDocs = () => {
           </div>
         </div>
 
+        {/* Top-level tabs: API Docs vs Technical Docs */}
+        <Tabs defaultValue="api" className="mb-8">
+          <TabsList className="mb-6">
+            <TabsTrigger value="api">API Documentation</TabsTrigger>
+            <TabsTrigger value="technical">Technical Documentation</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="api">
+            <div className="space-y-8">
+
         {/* Authentication Section */}
         <Card className="mb-8">
           <CardHeader>
