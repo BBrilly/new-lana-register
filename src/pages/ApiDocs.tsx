@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import CodeBlock from "@/components/api-docs/CodeBlock";
+import KeyDerivationDocs from "@/components/api-docs/KeyDerivationDocs";
 
 const ApiDocs = () => {
   const navigate = useNavigate();
@@ -301,6 +302,16 @@ const ApiDocs = () => {
             </a>
           </div>
         </div>
+
+        {/* Top-level tabs: API Docs vs Technical Docs */}
+        <Tabs defaultValue="api" className="mb-8">
+          <TabsList className="mb-6">
+            <TabsTrigger value="api">API Documentation</TabsTrigger>
+            <TabsTrigger value="technical">Technical Documentation</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="api">
+            <div className="space-y-8">
 
         {/* Authentication Section */}
         <Card className="mb-8">
@@ -1216,6 +1227,13 @@ if (statusTag && statusTag[1] === "frozen") {
             </a>
           </p>
         </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="technical">
+            <KeyDerivationDocs />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
