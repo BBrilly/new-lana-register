@@ -1227,6 +1227,13 @@ if (statusTag && statusTag[1] === "frozen") {
             </a>
           </p>
         </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="technical">
+            <KeyDerivationDocs />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
