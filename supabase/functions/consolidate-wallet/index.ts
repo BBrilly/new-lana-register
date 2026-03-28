@@ -411,9 +411,13 @@ async function buildSignedTx(
     console.log(`💰 Total input value: ${totalValue} lanoshis (${(totalValue / 100000000).toFixed(8)} LANA)`);
     console.log(`💸 Transaction: Amount=${totalAmount}, Fee=${fee}, Change=${totalValue - totalAmount - fee}`);
     
-    const privateKeyBytes = base58CheckDecode(privateKeyWIF);
-    const privateKeyHex = uint8ArrayToHex(privateKeyBytes.slice(1));
-    const publicKey = privateKeyToPublicKey(privateKeyHex);
+    // Decode WIF and detect compression to use correct public key type
+    const { privateKeyHex, isCompressed } = decodeWifKey(privateKeyWIF);
+    const publicKey = isCompressed 
+      ? privateKeyToCompressedPublicKey(privateKeyHex)
+      : privateKeyToUncompressedPublicKey(privateKeyHex);
+    
+    console.log(`🔑 Using ${isCompressed ? 'compressed (33-byte)' : 'uncompressed (65-byte)'} public key`);
     
     // Build recipient output
     const outputs = [];
