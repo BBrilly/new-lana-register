@@ -459,6 +459,25 @@ const LandingPage = () => {
     loadWalletBalances();
   }, []);
 
+  // Load balance snapshots for history chart
+  useEffect(() => {
+    const loadSnapshots = async () => {
+      try {
+        setSnapshotsLoading(true);
+        const { data } = await supabase
+          .from('balance_snapshots')
+          .select('*')
+          .order('recorded_at', { ascending: true });
+        setBalanceSnapshots(data || []);
+      } catch (error) {
+        console.error('Error loading balance snapshots:', error);
+      } finally {
+        setSnapshotsLoading(false);
+      }
+    };
+    loadSnapshots();
+  }, []);
+
   // Load registered lana events (Knights transactions) for current split
   useEffect(() => {
     const loadRegisteredEvents = async () => {
