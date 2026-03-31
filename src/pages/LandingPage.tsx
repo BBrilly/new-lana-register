@@ -2237,10 +2237,15 @@ const LandingPage = () => {
 
             {/* Frozen Wallets Tab */}
             <TabsContent value="frozen">
-              <div className="mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
                   Wallets currently frozen by the registrar
                 </p>
+                {frozenWallets.length > 0 && (
+                  <div className="text-sm font-medium">
+                    Total Frozen: <span className="text-destructive">{frozenTotalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LAN</span>
+                  </div>
+                )}
               </div>
 
               {frozenLoading ? (
@@ -2258,6 +2263,7 @@ const LandingPage = () => {
                         <TableHead>Owner</TableHead>
                         <TableHead>Wallet Type</TableHead>
                         <TableHead>Wallet Address</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -2276,6 +2282,9 @@ const LandingPage = () => {
                             {wallet.wallet_id
                               ? `${wallet.wallet_id.slice(0, 8)}...${wallet.wallet_id.slice(-6)}`
                               : '—'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="text-xs">
