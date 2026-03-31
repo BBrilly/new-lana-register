@@ -134,6 +134,27 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_snapshots: {
+        Row: {
+          id: string
+          recorded_at: string
+          total_balance_lana: number
+          wallet_count: number
+        }
+        Insert: {
+          id?: string
+          recorded_at?: string
+          total_balance_lana?: number
+          wallet_count?: number
+        }
+        Update: {
+          id?: string
+          recorded_at?: string
+          total_balance_lana?: number
+          wallet_count?: number
+        }
+        Relationships: []
+      }
       block_tx: {
         Row: {
           all_block_transactions: number
