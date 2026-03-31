@@ -260,7 +260,7 @@ function encodeDER(r: bigint, s: bigint): Uint8Array {
 function signECDSA(privateKeyHex: string, messageHash: Uint8Array): Uint8Array {
   const privateKeyBytes = hexToUint8Array(privateKeyHex);
   const signature = secp256k1.sign(messageHash, privateKeyBytes, { prehash: false, lowS: true });
-  return signature.toBytes('der');
+  return signature.toDERRawBytes();
 }
 
 async function connectElectrum(servers: any[], maxRetries = 3) {
