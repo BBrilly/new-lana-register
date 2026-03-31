@@ -43,6 +43,7 @@ const App = () => (
           <Route path="/lanapays" element={<LanaPaysPage />} />
           <Route path="/lana-discount" element={<LanaDiscountPage />} />
           <Route path="/frozen-wallets" element={<FrozenWalletsPage />} />
+          <Route path="/wallets/resolve-max-cap" element={<ResolveMaxCap />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
