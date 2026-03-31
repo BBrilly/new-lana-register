@@ -181,7 +181,7 @@ const ResolveMaxCap = () => {
           electrum_servers: electrumServers,
           relays: relays,
           user_pubkey_hex: authSession.nostrHexId,
-          original_event_id: '',
+          original_event_id: 'max-cap-resolve-' + Date.now(),
           from_wallet: fromWallet,
           to_wallet: donationWallet,
           amount_lanoshis: String(Math.round(sendAmount * 100000000)),
