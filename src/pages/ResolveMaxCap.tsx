@@ -33,8 +33,8 @@ const ResolveMaxCap = () => {
   const { balances, isLoading: isLoadingBalance } = useWalletBalances(fromWallet ? [fromWallet] : []);
   const balanceLana = fromWallet ? (balances.get(fromWallet) ?? 0) : 0;
 
-  const fee = 0.0001;
-  const sendAmount = Math.max(0, balanceLana - fee);
+  const fee = 0.001;
+  const sendAmount = Math.max(0, +(balanceLana - fee).toFixed(8));
   const hasSufficientBalance = balanceLana > fee;
 
   useEffect(() => {
