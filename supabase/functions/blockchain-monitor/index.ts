@@ -149,7 +149,6 @@ Deno.serve(async (req) => {
           const { data: wRows } = await supabase
             .from('wallets')
             .select('wallet_id')
-            .eq('frozen', false)
             .range(snapOffset, snapOffset + SNAP_PAGE - 1);
           if (!wRows || wRows.length === 0) { snapMore = false; }
           else {
