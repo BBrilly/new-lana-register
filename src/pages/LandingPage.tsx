@@ -2332,6 +2332,65 @@ const LandingPage = () => {
                 </div>
               )}
             </TabsContent>
+
+            {/* Balance History Tab */}
+            <TabsContent value="balancehistory">
+              {snapshotsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading balance history...</div>
+              ) : balanceSnapshots.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No balance snapshots recorded yet. Data will appear after the first hourly snapshot.</div>
+              ) : (
+                <>
+                  <div className="h-[400px] w-full mb-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={balanceSnapshots.map(s => ({
+                        time: new Date(s.recorded_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                        balance: Number(s.total_balance_lana),
+                        wallets: s.wallet_count,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="time" className="text-xs fill-muted-foreground" tick={{ fontSize: 10 }} />
+                        <YAxis className="text-xs fill-muted-foreground" tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
+                          formatter={(value: number) => [`${value.toLocaleString()} LANA`, 'Balance']}
+                        />
+                        <Line type="monotone" dataKey="balance" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time</TableHead>
+                          <TableHead className="text-right">Total Balance (LANA)</TableHead>
+                          <TableHead className="text-right">Wallets</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...balanceSnapshots].reverse().map((snap) => (
+                          <TableRow key={snap.id}>
+                            <TableCell className="text-xs">
+                              {new Date(snap.recorded_at).toLocaleString('en-GB', {
+                                day: '2-digit', month: '2-digit', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {Number(snap.total_balance_lana).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">{snap.wallet_count}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
           </Tabs>
         </Card>
       </div>
