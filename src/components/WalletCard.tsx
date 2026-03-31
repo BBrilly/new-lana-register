@@ -250,6 +250,29 @@ const WalletCard = ({ wallet, onDelete, onUpdateNotes, userCurrency, fxRates }: 
           </div>
         </div>
 
+        {/* Max Cap Freeze Resolution Button */}
+        {isFrozen && wallet.freezeReason === 'frozen_max_cap' && (
+          <div className="mt-4 rounded-lg border border-blue-400/30 bg-blue-50/50 dark:bg-blue-950/20 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Maximum Cap Exceeded</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Donate your entire balance to unfreeze this wallet.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/wallets/resolve-max-cap?wallet=${wallet.walletNumber}&walletUuid=${wallet.id}`)}
+                className="shrink-0 border-blue-400 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+              >
+                <Snowflake className="mr-2 h-4 w-4" />
+                Resolve Freeze
+              </Button>
+            </div>
+          </div>
+        )}
+
         {wallet.notification && (
           <Alert className="mt-4 border-l-4" variant={wallet.notification.type === "warning" ? "destructive" : "default"}>
             <div className="flex gap-2">

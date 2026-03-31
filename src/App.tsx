@@ -18,6 +18,7 @@ import KnightsPage from "./pages/KnightsPage";
 import LanaPaysPage from "./pages/LanaPaysPage";
 import LanaDiscountPage from "./pages/LanaDiscountPage";
 import FrozenWalletsPage from "./pages/FrozenWalletsPage";
+import ResolveMaxCap from "./pages/ResolveMaxCap";
 
 const queryClient = new QueryClient();
 
