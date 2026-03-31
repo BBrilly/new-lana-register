@@ -646,54 +646,16 @@ const LandingPage = () => {
     return walletBalances.filter(w => w.wallet_type === 'Lana.Discount');
   }, [walletBalances]);
 
-  // Frozen wallets state
-  const [frozenWallets, setFrozenWallets] = useState<WalletWithBalance[]>([]);
-  const [frozenLoading, setFrozenLoading] = useState(false);
+  // Frozen wallets derived from walletBalances (already have balances)
+  const frozenWallets = useMemo(() => {
+    return walletBalances.filter(w => w.frozen);
+  }, [walletBalances]);
 
-  useEffect(() => {
-    const loadFrozenWallets = async () => {
-      try {
-        setFrozenLoading(true);
-        const allFrozen: any[] = [];
-        const PAGE_SIZE = 1000;
-        let offset = 0;
-        let hasMore = true;
+  const frozenLoading = walletsLoading;
 
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('wallets')
-            .select(`id, wallet_id, wallet_type, freeze_reason, main_wallet:main_wallets(name, display_name)`)
-            .eq('frozen', true)
-            .range(offset, offset + PAGE_SIZE - 1);
-
-          if (error) throw error;
-          if (!data || data.length === 0) { hasMore = false; }
-          else {
-            allFrozen.push(...data);
-            hasMore = data.length === PAGE_SIZE;
-            offset += PAGE_SIZE;
-          }
-        }
-
-        setFrozenWallets(allFrozen.map(w => ({
-          id: w.id,
-          wallet_id: w.wallet_id,
-          wallet_type: w.wallet_type,
-          name: (w.main_wallet as any)?.name || null,
-          display_name: (w.main_wallet as any)?.display_name || null,
-          balance: 0,
-          freeze_reason: w.freeze_reason || "",
-        })));
-      } catch (err) {
-        console.error('Error loading frozen wallets:', err);
-      } finally {
-        setFrozenLoading(false);
-      }
-    };
-    loadFrozenWallets();
-  }, []);
-
-  const frozenTotalBalance = 0;
+  const frozenTotalBalance = useMemo(() => {
+    return frozenWallets.reduce((sum, w) => sum + w.balance, 0);
+  }, [frozenWallets]);
 
   const lana8WonderTotalBalance = useMemo(() => {
     return lana8WonderWallets.reduce((sum, w) => sum + w.balance, 0);
