@@ -1,56 +1,46 @@
 
 
-## Plan: Self-Unfreeze for "Max Cap Exceeded" Frozen Wallets
+## Plan: Hourly Balance Snapshots with Chart
 
 ### Overview
-When a user's wallet is frozen with reason `frozen_max_cap`, they see a "Resolve Max Cap" button on their wallet card. Clicking it opens a flow similar to "Send to Register" — the user enters their WIF private key, and **all LANA** from that wallet is sent to a special donation wallet (`max_cap_freeze` wallet stored in `app_settings`). After successful broadcast, the system automatically unfreezes the wallet.
-
-### How it works
-
-```text
-User sees frozen wallet (frozen_max_cap)
-    → Clicks "Resolve Max Cap Freeze"
-    → Navigated to /wallets/resolve-max-cap?wallet=ADDRESS&walletUuid=UUID
-    → Enters WIF private key
-    → ALL balance sent to special "max_cap_donation_wallet" address
-    → Edge function broadcasts TX + unfreezes wallet + publishes KIND 30889
-    → User redirected back to wallets (balance = 0, unfrozen)
-```
+Every hour, the blockchain monitor records the total LANA balance across all registered wallets into a new table. A new "Balance History" tab on the Landing page displays this data as a line chart and table.
 
 ### Changes
 
-#### 1. Database: Add donation wallet address to `app_settings`
-- Insert row: `key = 'max_cap_donation_wallet'`, `value = '<WALLET_ADDRESS>'`
-- Will ask user for the actual wallet address during implementation
+#### 1. New database table: `balance_snapshots`
+- `id` (uuid, PK)
+- `total_balance_lana` (numeric) — sum of all wallet balances
+- `wallet_count` (integer) — number of wallets included
+- `recorded_at` (timestamptz, default now())
+- RLS: public SELECT, service-role INSERT (via edge function)
 
-#### 2. `src/components/WalletCard.tsx`
-- When `wallet.frozen && wallet.freezeReason === 'frozen_max_cap'`, show a "Resolve Max Cap" button
-- Button navigates to `/wallets/resolve-max-cap?wallet=ADDR&walletUuid=UUID`
+#### 2. Update `blockchain-monitor` edge function
+At the end of the existing run, check if the last snapshot is older than 55 minutes. If so:
+- Query all wallets, sum their balances (same logic used for the landing page wallet balances — fetch each wallet's transaction sum)
+- Insert a row into `balance_snapshots`
+- This ensures one snapshot per hour without a separate cron job
 
-#### 3. New page: `src/pages/ResolveMaxCap.tsx`
-- Similar to `SendToRegister.tsx` but:
-  - Fetches destination from `app_settings` key `max_cap_donation_wallet`
-  - Sends **entire balance** (not a fixed amount) to donation wallet
-  - After successful TX, calls `freeze-wallets` edge function with `freeze: false` to unfreeze
-  - Shows clear explanation: "Your wallet exceeded the maximum cap. To unfreeze, donate all LANA to the system wallet."
+#### 3. New tab on Landing page: "Balance History"
+- Add a `TabsTrigger` for "Balance History" with a chart icon
+- Fetch data from `balance_snapshots` ordered by `recorded_at`
+- Display a **line chart** (using existing Recharts/ChartContainer) showing `total_balance_lana` over time (x-axis: hours/dates, y-axis: LANA)
+- Below the chart, show a simple table with timestamp, total balance, and wallet count
 
-#### 4. Edge function reuse
-- **Transaction**: Reuse `return-lanas-and-send-KIND-87009` (same TX building logic — send full balance to a target address)
-- **Unfreeze**: Call `freeze-wallets` with `freeze: false` after successful TX broadcast
-- No new edge function needed
+#### 4. Snapshot logic detail
+In `blockchain-monitor/index.ts`, after the main block processing (before the final response):
+```text
+1. Query balance_snapshots for the most recent recorded_at
+2. If no record exists OR last record is > 55 min ago:
+   a. Query all wallets (non-frozen) and calculate sum of balances
+      via transactions table (credits - debits per wallet)
+   b. INSERT into balance_snapshots
+3. Log result
+```
 
-#### 5. `src/App.tsx`
-- Add route `/wallets/resolve-max-cap` → `ResolveMaxCap`
-
-### Technical details
-- The page reads wallet balance via `useWalletBalances` hook
-- Sends `balance - fee` to the donation wallet (sweep all funds)
-- After TX success, invokes `freeze-wallets` with `{ wallet_ids: [walletUuid], freeze: false, nostr_hex_id: userHexId }` to unfreeze and broadcast updated KIND 30889
-- The memo for the KIND 87009 event: `"Max cap exceeded — balance donated to resolve freeze."`
+The balance calculation reuses the same approach the landing page uses: sum of incoming transactions minus outgoing transactions per wallet, then grand total.
 
 ### Files to create/modify
-1. **`src/pages/ResolveMaxCap.tsx`** — New page (based on SendToRegister pattern)
-2. **`src/components/WalletCard.tsx`** — Add "Resolve Max Cap" button for frozen_max_cap wallets
-3. **`src/App.tsx`** — Add new route
-4. **`app_settings`** — Insert `max_cap_donation_wallet` address (will ask user for value)
+1. **Database migration** — Create `balance_snapshots` table with RLS
+2. **`supabase/functions/blockchain-monitor/index.ts`** — Add hourly snapshot logic at the end
+3. **`src/pages/LandingPage.tsx`** — Add "Balance History" tab with chart and table
 
