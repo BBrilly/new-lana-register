@@ -499,65 +499,67 @@ Deno.serve(async (req) => {
       if (now - lastTime > fiftyFiveMin) {
         console.log('📊 Taking hourly balance snapshot...');
 
-        // Fetch all non-frozen wallets
-        const allWalletIds: string[] = [];
+        // Fetch all non-frozen wallet addresses
+        const allWalletAddresses: string[] = [];
         let snapOffset = 0;
         const SNAP_PAGE = 1000;
         let snapMore = true;
         while (snapMore) {
           const { data: wRows } = await supabase
             .from('wallets')
-            .select('id')
+            .select('wallet_id')
             .eq('frozen', false)
             .range(snapOffset, snapOffset + SNAP_PAGE - 1);
           if (!wRows || wRows.length === 0) { snapMore = false; }
           else {
-            wRows.forEach((w: any) => allWalletIds.push(w.id));
+            wRows.forEach((w: any) => { if (w.wallet_id) allWalletAddresses.push(w.wallet_id); });
             snapMore = wRows.length === SNAP_PAGE;
             snapOffset += SNAP_PAGE;
           }
         }
 
-        if (allWalletIds.length > 0) {
-          // Sum balances via transactions (credits - debits) per wallet
-          // Fetch all transactions involving these wallets
-          let totalBalance = 0;
+        if (allWalletAddresses.length > 0) {
+          // Get Electrum servers from system parameters
+          const { data: snapSysParams } = await supabase
+            .from('system_parameters')
+            .select('electrum')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-          // Process in batches of 100 wallet IDs to avoid query limits
-          const BATCH = 100;
-          for (let i = 0; i < allWalletIds.length; i += BATCH) {
-            const batch = allWalletIds.slice(i, i + BATCH);
+          const electrumServers = snapSysParams?.electrum
+            ? (snapSysParams.electrum as any[]).map((s: any) => ({ host: s.host, port: parseInt(s.port, 10) }))
+            : [];
 
-            // Credits (incoming)
-            const { data: credits } = await supabase
-              .from('transactions')
-              .select('amount')
-              .in('to_wallet_id', batch);
+          if (electrumServers.length > 0) {
+            // Call fetch-wallet-balance edge function for real blockchain balances
+            const { data: balanceData, error: balFnErr } = await supabase.functions.invoke(
+              'fetch-wallet-balance',
+              { body: { wallet_addresses: allWalletAddresses, electrum_servers: electrumServers } }
+            );
 
-            const creditSum = credits?.reduce((s: number, t: any) => s + Number(t.amount), 0) || 0;
+            if (balFnErr) {
+              console.error('❌ Balance fetch error for snapshot:', balFnErr.message);
+            } else if (balanceData?.success && balanceData.wallets) {
+              const totalBalance = balanceData.wallets.reduce((s: number, w: any) => s + (w.balance || 0), 0);
 
-            // Debits (outgoing)
-            const { data: debits } = await supabase
-              .from('transactions')
-              .select('amount')
-              .in('from_wallet_id', batch);
+              const { error: snapErr } = await supabase
+                .from('balance_snapshots')
+                .insert({
+                  total_balance_lana: totalBalance,
+                  wallet_count: allWalletAddresses.length,
+                });
 
-            const debitSum = debits?.reduce((s: number, t: any) => s + Number(t.amount), 0) || 0;
-
-            totalBalance += creditSum - debitSum;
-          }
-
-          const { error: snapErr } = await supabase
-            .from('balance_snapshots')
-            .insert({
-              total_balance_lana: totalBalance,
-              wallet_count: allWalletIds.length,
-            });
-
-          if (snapErr) {
-            console.error('❌ Balance snapshot insert error:', snapErr.message);
+              if (snapErr) {
+                console.error('❌ Balance snapshot insert error:', snapErr.message);
+              } else {
+                console.log(`📊 Balance snapshot saved: ${totalBalance} LANA across ${allWalletAddresses.length} wallets`);
+              }
+            } else {
+              console.error('❌ Balance fetch returned no data for snapshot');
+            }
           } else {
-            console.log(`📊 Balance snapshot saved: ${totalBalance} LANA across ${allWalletIds.length} wallets`);
+            console.error('❌ No Electrum servers for snapshot');
           }
         }
       }
