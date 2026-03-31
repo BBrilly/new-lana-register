@@ -1,0 +1,1 @@
+DELETE FROM public.balance_snapshots WHERE total_balance_lana < 0;
