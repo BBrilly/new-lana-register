@@ -92,6 +92,10 @@ const LandingPage = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [fxRatesWallets, setFxRatesWallets] = useState<{ EUR: number; GBP: number; USD: number } | null>(null);
 
+  // Balance history state
+  const [balanceSnapshots, setBalanceSnapshots] = useState<any[]>([]);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(false);
+
   // Calculate 50 EUR/GBP/USD limit in LANA
   const lanaLimits = useMemo(() => {
     if (!fxRatesWallets) return null;
