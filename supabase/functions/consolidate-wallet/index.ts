@@ -257,18 +257,9 @@ function encodeDER(r: bigint, s: bigint): Uint8Array {
 }
 
 function signECDSA(privateKeyHex: string, messageHash: Uint8Array): Uint8Array {
-  const privateKey = BigInt('0x' + privateKeyHex);
-  const z = BigInt('0x' + uint8ArrayToHex(messageHash));
-  const k = Point.mod(z + privateKey, Point.N);
-  if (k === 0n) throw new Error('Invalid k');
-  const kG = Point.G.multiply(k);
-  const r = Point.mod(kG.x, Point.N);
-  if (r === 0n) throw new Error('Invalid r');
-  const kInv = Point.modInverse(k, Point.N);
-  const s = Point.mod(kInv * (z + r * privateKey), Point.N);
-  if (s === 0n) throw new Error('Invalid s');
-  const finalS = s > Point.N / 2n ? Point.N - s : s;
-  return encodeDER(r, finalS);
+  const privateKeyBytes = hexToUint8Array(privateKeyHex);
+  const signature = secp256k1.sign(messageHash, privateKeyBytes, { prehash: false, lowS: true });
+  return signature.toBytes('der');
 }
 
 async function connectElectrum(servers: any[], maxRetries = 3) {
