@@ -123,8 +123,81 @@ Deno.serve(async (req) => {
       blocksToProcess.push(height);
     }
 
+    // ── Helper: Hourly balance snapshot ──
+    async function tryBalanceSnapshot() {
+      try {
+        const { data: lastSnapshot } = await supabase
+          .from('balance_snapshots')
+          .select('recorded_at')
+          .order('recorded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const now = Date.now();
+        const lastTime = lastSnapshot?.recorded_at ? new Date(lastSnapshot.recorded_at).getTime() : 0;
+        const fiftyFiveMin = 55 * 60 * 1000;
+
+        if (now - lastTime <= fiftyFiveMin) return;
+
+        console.log('📊 Taking hourly balance snapshot...');
+
+        const allWalletAddresses: string[] = [];
+        let snapOffset = 0;
+        const SNAP_PAGE = 1000;
+        let snapMore = true;
+        while (snapMore) {
+          const { data: wRows } = await supabase
+            .from('wallets')
+            .select('wallet_id')
+            .eq('frozen', false)
+            .range(snapOffset, snapOffset + SNAP_PAGE - 1);
+          if (!wRows || wRows.length === 0) { snapMore = false; }
+          else {
+            wRows.forEach((w: any) => { if (w.wallet_id) allWalletAddresses.push(w.wallet_id); });
+            snapMore = wRows.length === SNAP_PAGE;
+            snapOffset += SNAP_PAGE;
+          }
+        }
+
+        if (allWalletAddresses.length === 0) return;
+
+        const { data: snapSysParams } = await supabase
+          .from('system_parameters')
+          .select('electrum')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const electrumServers = snapSysParams?.electrum
+          ? (snapSysParams.electrum as any[]).map((s: any) => ({ host: s.host, port: parseInt(s.port, 10) }))
+          : [];
+
+        if (electrumServers.length === 0) { console.error('❌ No Electrum servers for snapshot'); return; }
+
+        const { data: balanceData, error: balFnErr } = await supabase.functions.invoke(
+          'fetch-wallet-balance',
+          { body: { wallet_addresses: allWalletAddresses, electrum_servers: electrumServers } }
+        );
+
+        if (balFnErr) { console.error('❌ Balance fetch error for snapshot:', balFnErr.message); return; }
+        if (!balanceData?.success || !balanceData.wallets) { console.error('❌ Balance fetch returned no data for snapshot'); return; }
+
+        const totalBalance = balanceData.wallets.reduce((s: number, w: any) => s + (w.balance || 0), 0);
+
+        const { error: snapErr } = await supabase
+          .from('balance_snapshots')
+          .insert({ total_balance_lana: totalBalance, wallet_count: allWalletAddresses.length });
+
+        if (snapErr) console.error('❌ Balance snapshot insert error:', snapErr.message);
+        else console.log(`📊 Balance snapshot saved: ${totalBalance} LANA across ${allWalletAddresses.length} wallets`);
+      } catch (snapError) {
+        console.error('❌ Balance snapshot error:', snapError);
+      }
+    }
+
     if (blocksToProcess.length === 0) {
       console.log('No new blocks to process');
+      await tryBalanceSnapshot();
       return new Response(JSON.stringify({
         message: 'No new blocks to process',
         currentHeight,
