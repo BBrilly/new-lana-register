@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ripemd160 } from "https://esm.sh/hash.js@1.1.7";
-import { schnorr } from "https://esm.sh/@noble/curves@1.8.1/secp256k1";
-import { bytesToHex as nobleToHex, hexToBytes as nobleFromHex } from "https://esm.sh/@noble/hashes@1.7.1/utils";
+import { schnorr, secp256k1 } from "https://esm.sh/@noble/curves@1.8.1/secp256k1";
+import { bytesToHex as nobleToHex } from "https://esm.sh/@noble/hashes@1.7.1/utils";
 import { sha256 } from "https://esm.sh/@noble/hashes@1.7.1/sha256";
 
 const corsHeaders = {

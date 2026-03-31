@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { secp256k1 } from "https://esm.sh/@noble/curves@1.8.1/secp256k1";
 import { ripemd160 } from "https://esm.sh/hash.js@1.1.7";
 
 const corsHeaders = {
