@@ -483,6 +483,88 @@ Deno.serve(async (req) => {
       console.log(`⚠️ Failed blocks: [${failedBlocks.join(', ')}]`);
     }
 
+    // ── Hourly balance snapshot ──
+    try {
+      const { data: lastSnapshot } = await supabase
+        .from('balance_snapshots')
+        .select('recorded_at')
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const now = Date.now();
+      const lastTime = lastSnapshot?.recorded_at ? new Date(lastSnapshot.recorded_at).getTime() : 0;
+      const fiftyFiveMin = 55 * 60 * 1000;
+
+      if (now - lastTime > fiftyFiveMin) {
+        console.log('📊 Taking hourly balance snapshot...');
+
+        // Fetch all non-frozen wallets
+        const allWalletIds: string[] = [];
+        let snapOffset = 0;
+        const SNAP_PAGE = 1000;
+        let snapMore = true;
+        while (snapMore) {
+          const { data: wRows } = await supabase
+            .from('wallets')
+            .select('id')
+            .eq('frozen', false)
+            .range(snapOffset, snapOffset + SNAP_PAGE - 1);
+          if (!wRows || wRows.length === 0) { snapMore = false; }
+          else {
+            wRows.forEach((w: any) => allWalletIds.push(w.id));
+            snapMore = wRows.length === SNAP_PAGE;
+            snapOffset += SNAP_PAGE;
+          }
+        }
+
+        if (allWalletIds.length > 0) {
+          // Sum balances via transactions (credits - debits) per wallet
+          // Fetch all transactions involving these wallets
+          let totalBalance = 0;
+
+          // Process in batches of 100 wallet IDs to avoid query limits
+          const BATCH = 100;
+          for (let i = 0; i < allWalletIds.length; i += BATCH) {
+            const batch = allWalletIds.slice(i, i + BATCH);
+
+            // Credits (incoming)
+            const { data: credits } = await supabase
+              .from('transactions')
+              .select('amount')
+              .in('to_wallet_id', batch);
+
+            const creditSum = credits?.reduce((s: number, t: any) => s + Number(t.amount), 0) || 0;
+
+            // Debits (outgoing)
+            const { data: debits } = await supabase
+              .from('transactions')
+              .select('amount')
+              .in('from_wallet_id', batch);
+
+            const debitSum = debits?.reduce((s: number, t: any) => s + Number(t.amount), 0) || 0;
+
+            totalBalance += creditSum - debitSum;
+          }
+
+          const { error: snapErr } = await supabase
+            .from('balance_snapshots')
+            .insert({
+              total_balance_lana: totalBalance,
+              wallet_count: allWalletIds.length,
+            });
+
+          if (snapErr) {
+            console.error('❌ Balance snapshot insert error:', snapErr.message);
+          } else {
+            console.log(`📊 Balance snapshot saved: ${totalBalance} LANA across ${allWalletIds.length} wallets`);
+          }
+        }
+      }
+    } catch (snapError) {
+      console.error('❌ Balance snapshot error:', snapError);
+    }
+
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
