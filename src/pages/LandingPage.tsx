@@ -631,7 +631,7 @@ const LandingPage = () => {
   }, [walletBalances]);
 
   const allWallets = useMemo(() => {
-    return walletBalances.filter(w => w.wallet_type === 'Wallet' || w.wallet_type === 'Main Wallet');
+    return walletBalances.filter(w => (w.wallet_type === 'Wallet' || w.wallet_type === 'Main Wallet') && !w.frozen);
   }, [walletBalances]);
 
   const lana8WonderWallets = useMemo(() => {
@@ -646,54 +646,16 @@ const LandingPage = () => {
     return walletBalances.filter(w => w.wallet_type === 'Lana.Discount');
   }, [walletBalances]);
 
-  // Frozen wallets state
-  const [frozenWallets, setFrozenWallets] = useState<WalletWithBalance[]>([]);
-  const [frozenLoading, setFrozenLoading] = useState(false);
+  // Frozen wallets derived from walletBalances (already have balances)
+  const frozenWallets = useMemo(() => {
+    return walletBalances.filter(w => w.frozen);
+  }, [walletBalances]);
 
-  useEffect(() => {
-    const loadFrozenWallets = async () => {
-      try {
-        setFrozenLoading(true);
-        const allFrozen: any[] = [];
-        const PAGE_SIZE = 1000;
-        let offset = 0;
-        let hasMore = true;
+  const frozenLoading = walletsLoading;
 
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('wallets')
-            .select(`id, wallet_id, wallet_type, freeze_reason, main_wallet:main_wallets(name, display_name)`)
-            .eq('frozen', true)
-            .range(offset, offset + PAGE_SIZE - 1);
-
-          if (error) throw error;
-          if (!data || data.length === 0) { hasMore = false; }
-          else {
-            allFrozen.push(...data);
-            hasMore = data.length === PAGE_SIZE;
-            offset += PAGE_SIZE;
-          }
-        }
-
-        setFrozenWallets(allFrozen.map(w => ({
-          id: w.id,
-          wallet_id: w.wallet_id,
-          wallet_type: w.wallet_type,
-          name: (w.main_wallet as any)?.name || null,
-          display_name: (w.main_wallet as any)?.display_name || null,
-          balance: 0,
-          freeze_reason: w.freeze_reason || "",
-        })));
-      } catch (err) {
-        console.error('Error loading frozen wallets:', err);
-      } finally {
-        setFrozenLoading(false);
-      }
-    };
-    loadFrozenWallets();
-  }, []);
-
-  const frozenTotalBalance = 0;
+  const frozenTotalBalance = useMemo(() => {
+    return frozenWallets.reduce((sum, w) => sum + w.balance, 0);
+  }, [frozenWallets]);
 
   const lana8WonderTotalBalance = useMemo(() => {
     return lana8WonderWallets.reduce((sum, w) => sum + w.balance, 0);
@@ -2275,10 +2237,15 @@ const LandingPage = () => {
 
             {/* Frozen Wallets Tab */}
             <TabsContent value="frozen">
-              <div className="mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
                   Wallets currently frozen by the registrar
                 </p>
+                {frozenWallets.length > 0 && (
+                  <div className="text-sm font-medium">
+                    Total Frozen: <span className="text-destructive">{frozenTotalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LAN</span>
+                  </div>
+                )}
               </div>
 
               {frozenLoading ? (
@@ -2296,6 +2263,7 @@ const LandingPage = () => {
                         <TableHead>Owner</TableHead>
                         <TableHead>Wallet Type</TableHead>
                         <TableHead>Wallet Address</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -2314,6 +2282,9 @@ const LandingPage = () => {
                             {wallet.wallet_id
                               ? `${wallet.wallet_id.slice(0, 8)}...${wallet.wallet_id.slice(-6)}`
                               : '—'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="text-xs">
